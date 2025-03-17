@@ -47,9 +47,9 @@ six==1.17.0
 smplx==0.1.28
 sympy==1.13.1
 tifffile==2025.2.18
-torch==2.6.0+cu124
-torchaudio==2.6.0+cu124
-torchvision==0.21.0+cu124
+#torch==2.6.0+cu124
+#torchaudio==2.6.0+cu124
+#torchvision==0.21.0+cu124
 tqdm==4.66.3
 transformations==2022.9.26
 trimesh==3.22.1

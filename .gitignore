@@ -2,3 +2,4 @@ __pycache__/
 data/
 imgui.ini
 tools/smplh/
+env/
