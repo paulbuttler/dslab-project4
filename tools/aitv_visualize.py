@@ -1,11 +1,13 @@
 import argparse
 import json
 import cv2
+import utils
 from pathlib import Path
 import numpy as np
 from aitviewer.models.smpl import SMPLLayer
 from aitviewer.renderables.smpl import SMPLSequence
 from aitviewer.viewer import Viewer
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -51,7 +53,7 @@ if __name__ == '__main__':
         poses_root=global_orient,
         poses_left_hand=left_hand_pose,
         poses_right_hand=right_hand_pose,
-        # trans=translation.reshape(1, -1),
+        trans=translation.reshape(1, -1),
     )
 
     # Display the image and SMPL sequence
@@ -60,4 +62,7 @@ if __name__ == '__main__':
 
     v = Viewer()
     v.scene.add(smpl_seq)
+
+    utils.set_camera_from_extrinsics(v.scene.camera, world_to_camera)
+
     v.run()
