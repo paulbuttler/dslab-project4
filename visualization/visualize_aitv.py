@@ -1,17 +1,18 @@
 import argparse
 import json
 import cv2
-import utils
 from pathlib import Path
 import numpy as np
 from aitviewer.models.smpl import SMPLLayer
 from aitviewer.renderables.smpl import SMPLSequence
+from aitviewer.renderables.billboard import Billboard
+from aitviewer.scene.camera import OpenCVCamera
+from aitviewer.renderables.spheres import Spheres
 from aitviewer.viewer import Viewer
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("data_dir", type=Path)
+    parser.add_argument("--data_dir", type=Path, default="data/synth_body")
     parser.add_argument("--sidx", type=int, default=0)
     parser.add_argument("--fidx", type=int, default=0)
     args = parser.parse_args()
@@ -24,6 +25,8 @@ if __name__ == '__main__':
 
     # Convert json metadata to NumPy arrays
     ldmks_2d = np.asarray(metadata["landmarks"]["2D"])
+    ldmks_3d_world = np.asarray(metadata["landmarks"]["3D_world"])
+    ldmks_3d_camera = np.asarray(metadata["landmarks"]["3D_cam"])
     body_identity = np.asarray(metadata["body_identity"])
     pose = np.asarray(metadata["pose"])
     translation = np.asarray(metadata["translation"])
@@ -31,6 +34,7 @@ if __name__ == '__main__':
     camera_to_image = np.asarray(metadata["camera"]["camera_to_image"])
 
     print("ldmks_2d:", ldmks_2d.shape)
+    print("ldmks_3d_world:", ldmks_3d_world.shape)
     print("body_identity:", body_identity.shape)
     print("pose:", pose.shape)
     print("translation:", translation.shape)
@@ -45,7 +49,7 @@ if __name__ == '__main__':
     body_shape = body_identity[:10].reshape(1, -1)
 
     # Create SMPL sequence
-    smpl_layer = SMPLLayer(model_type="smplh", gender="male")
+    smpl_layer = SMPLLayer(model_type="smplh", gender="neutral")
     smpl_seq = SMPLSequence(
         smpl_layer=smpl_layer,
         poses_body=body_pose,
@@ -56,13 +60,19 @@ if __name__ == '__main__':
         trans=translation.reshape(1, -1),
     )
 
-    # Display the image and SMPL sequence
-    frame = cv2.imread(str(img_file))
-    cv2.imshow("Image", frame)
+    # Load the input image
+    input_img = cv2.imread(img_file)
+    img_rgb = cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB)
+    cols, rows = input_img.shape[1], input_img.shape[0]
 
-    v = Viewer()
-    v.scene.add(smpl_seq)
+    v = Viewer(size=(cols, rows))
 
-    utils.set_camera_from_extrinsics(v.scene.camera, world_to_camera)
+    # Create an OpenCV camera.
+    camera = OpenCVCamera(camera_to_image, world_to_camera[:3], cols, rows, viewer=v)
 
+    # Load the reference image and create a Billboard.
+    pc = Billboard.from_camera_and_distance(camera, 5.0, cols, rows, [img_rgb])
+
+    v.scene.add(pc, smpl_seq, camera)
+    v.set_temp_camera(camera)
     v.run()
