@@ -8,13 +8,12 @@ import cv2
 import numpy as np
 from src import utils
 from pathlib import Path
-from aitviewer.models.smpl import SMPLLayer
-from aitviewer.renderables.smpl import SMPLSequence
-from aitviewer.renderables.billboard import Billboard
-from aitviewer.scene.camera import OpenCVCamera
-from aitviewer.renderables.spheres import Spheres
-from aitviewer.viewer import Viewer
-
+from aitviewer.models.smpl import SMPLLayer  # type: ignore
+from aitviewer.renderables.smpl import SMPLSequence  # type: ignore
+from aitviewer.renderables.billboard import Billboard  # type: ignore
+from aitviewer.scene.camera import OpenCVCamera  # type: ignore
+from aitviewer.renderables.spheres import Spheres  # type: ignore
+from aitviewer.viewer import Viewer  # type: ignore
 
 
 LDMK_CONN = {
