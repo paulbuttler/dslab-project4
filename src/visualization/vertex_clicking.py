@@ -20,7 +20,7 @@ class ClickingViewer(Viewer):
         super().__init__(**kwargs)
         # Initialize an empty list to store the vertices we clicked on.
         self.clicked_vertices = []
-        self.file_path = "src/visualization/body_vertices.npy"
+        self.file_path = "src/visualization/vertices/body_vertices.npy"
 
     def save_clicked_vertices(self):
         """

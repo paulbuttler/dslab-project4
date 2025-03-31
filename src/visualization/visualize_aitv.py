@@ -177,15 +177,15 @@ if __name__ == '__main__':
     v.scene.add(billboard, spheres, smpl_seq, camera)
     v.set_temp_camera(camera)
 
-    # Display the set of clicked_vertices SMPL-H model.
-    vertex_indices = np.int64(np.load("src/visualization/body_vertices.npy"))
+    # Display the set of generated vertices of the SMPL-H model.
+    vertex_indices = np.int64(np.load("src/visualization/vertices/body_vertices.npy"))
 
     # Extract the positions of the specified vertices
     vertex_positions = smpl_seq.vertices[:, vertex_indices] + smpl_seq.position[np.newaxis]
     print("vertex_positions:", vertex_positions.shape)
 
     vertices = Spheres(vertex_positions, name="Body_Vertices", radius=0.007, color=(0.0, 0.0, 1.0, 1.0))
-    
+
     v.scene.add(vertices)
 
     # Viewer settings.
