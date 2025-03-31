@@ -16,11 +16,15 @@ class ClickingViewer(Viewer):
 
     title = "Clicking Viewer"
 
-    def __init__(self, **kwargs):
+    def __init__(self, body_part, **kwargs):
         super().__init__(**kwargs)
         # Initialize an empty list to store the vertices we clicked on.
         self.clicked_vertices = []
-        self.file_path = "src/visualization/vertices/body_vertices.npy"
+        self.body_part = body_part
+        if self.body_part == "hand":
+            self.file_path = "src/visualization/vertices/hand_vertices.npy"
+        elif self.body_part == "body":
+            self.file_path = "src/visualization/vertices/body_vertices.npy"
 
     def save_clicked_vertices(self):
         """
@@ -48,7 +52,12 @@ class ClickingViewer(Viewer):
         # Append the clicked vertex to the list.
         self.clicked_vertices.append(intersection.vert_id)
 
-        ms = Spheres(positions, name="{}".format(intersection.vert_id), radius=0.005)
+        if self.body_part == "hand":
+            radius = 0.0015
+        elif self.body_part == "body":
+            radius = 0.005
+
+        ms = Spheres(positions, name="{}".format(intersection.vert_id), radius=radius)
 
         ms.current_frame_id = seq.current_frame_id
         self.scene.add(ms)
@@ -79,7 +88,10 @@ if __name__ == "__main__":
     #
     # To place spheres onto vertices, it might be easier to show the edges
     # by hitting the `E` key.
-    v = ClickingViewer()
+
+    file_to_edit = "hand"
+
+    v = ClickingViewer(file_to_edit)
 
     smpl_layer = SMPLLayer(model_type="smplh", gender="neutral")
     poses = np.zeros([1, smpl_layer.bm.NUM_BODY_JOINTS * 3])
@@ -90,12 +102,36 @@ if __name__ == "__main__":
     # vertex_indices = np.delete(vertex_indices, np.where(np.isin(vertex_indices, [1125, 1111, 1093, 1060, 995, 1039, 991, 965]))[0])
     # np.save(v.file_path, vertex_indices)
 
-    # Display the set of clicked_vertices SMPL-H model.
-    vertex_indices = np.int64(np.load(v.file_path))
-    vertex_positions = smpl_seq.vertices[:, vertex_indices] + smpl_seq.position[np.newaxis]
-    print("vertex_positions:", vertex_positions.shape)
-    vertices = Spheres(vertex_positions, name="Body_Vertices", radius=0.007, color=(0.0, 0.0, 1.0, 1.0))
-    v.scene.add(vertices)
+    # Display the set of generated vertices for the SMPL-H model.
+    vertex_indices_body = np.int64(
+        np.load("src/visualization/vertices/body_vertices.npy")
+    )
+    vertex_positions_body = (
+        smpl_seq.vertices[:, vertex_indices_body] + smpl_seq.position[np.newaxis]
+    )
+    print("Number of Body vertices:", vertex_positions_body.shape[1])
+    vertices_body = Spheres(
+        vertex_positions_body,
+        name="Body_Vertices",
+        radius=0.005,
+        color=(0.0, 0.0, 1.0, 1.0),
+    )
+    v.scene.add(vertices_body)
+
+    vertex_indices_hand = np.int64(
+        np.load("src/visualization/vertices/hand_vertices.npy")
+    )
+    vertex_positions_hand = (
+        smpl_seq.vertices[:, vertex_indices_hand] + smpl_seq.position[np.newaxis]
+    )
+    print("Hand_vertices:", vertex_positions_hand.shape)
+    vertices_hand = Spheres(
+        vertex_positions_hand,
+        name="Hand_Vertices",
+        radius=0.0015,
+        color=(0.0, 1.0, 1.0, 1.0),
+    )
+    v.scene.add(vertices_hand)
 
     # Display in viewer.
     v.scene.add(smpl_seq)

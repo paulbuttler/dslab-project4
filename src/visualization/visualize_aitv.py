@@ -177,7 +177,7 @@ if __name__ == '__main__':
     v.scene.add(billboard, spheres, smpl_seq, camera)
     v.set_temp_camera(camera)
 
-    # Display the set of generated vertices of the SMPL-H model.
+    # Display the set of generated vertices for the SMPL-H model.
     vertex_indices = np.int64(np.load("src/visualization/vertices/body_vertices.npy"))
 
     # Extract the positions of the specified vertices
