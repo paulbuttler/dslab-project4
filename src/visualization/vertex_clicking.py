@@ -105,7 +105,7 @@ if __name__ == "__main__":
     poses = np.zeros([1, smpl_layer.bm.NUM_BODY_JOINTS * 3])
     smpl_seq = SMPLSequence(poses, smpl_layer)
 
-    # # Delete specific vertex indices from the file.
+    # # Delete specific vertex indices from the file. Uncomment if needed.
     # vertex_indices = np.load(v.file_path)
     # vertex_indices = np.delete(
     #     vertex_indices,
@@ -129,13 +129,17 @@ if __name__ == "__main__":
         vertices = Spheres(
             vertex_positions,
             name=f"{i}_Vertices",
-            radius=0.004 if i == "body" else 0.003,
+            radius=0.004,
             color=(0.0, 0.0, 1.0, 1.0),
         )
         v.scene.add(vertices)
 
     # Display in viewer.
     v.scene.add(smpl_seq)
+    v.scene.floor.enabled = False
+    v.scene.origin.enabled = False
+    v.shadows_enabled = False
+
     try:
         v.run()
     finally:
