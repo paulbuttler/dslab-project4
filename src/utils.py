@@ -30,14 +30,18 @@ def draw_landmarks(
 
     for ldmk in ldmks_2d.astype(int):
         if np.all(ldmk > 0) and np.all(ldmk < img_size):
-            if connectivity is not None:
-                cv2.circle(
-                    img, tuple(ldmk + 1), thickness + 1, (0, 0, 0), -1, cv2.LINE_AA
-                )
+            cv2.circle(
+                img,
+                tuple(ldmk + 1),
+                thickness + (1 if connectivity is not None else 0),
+                (0, 0, 0),
+                -1,
+                cv2.LINE_AA,
+            )
             cv2.circle(
                 img,
                 tuple(ldmk),
-                thickness + 1 if connectivity is not None else thickness,
+                thickness + (1 if connectivity is not None else 0),
                 color,
                 -1,
                 cv2.LINE_AA,
