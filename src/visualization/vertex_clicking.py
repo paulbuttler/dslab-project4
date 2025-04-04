@@ -97,7 +97,7 @@ if __name__ == "__main__":
     # To place spheres onto vertices, it might be easier to show the edges
     # by hitting the `E` key.
 
-    file_to_edit = "head"
+    file_to_edit = "body"
 
     v = ClickingViewer(file_to_edit)
 
@@ -107,72 +107,32 @@ if __name__ == "__main__":
 
     # # Delete specific vertex indices from the file.
     # vertex_indices = np.load(v.file_path)
-    # vertex_indices = np.delete(vertex_indices, np.where(np.isin(vertex_indices, [0]))[0])
+    # vertex_indices = np.delete(
+    #     vertex_indices,
+    #     np.where(
+    #         np.isin(vertex_indices, [0])
+    #     )[0],
+    # )
     # np.save(v.file_path, vertex_indices)
 
-    # # Display the set of generated vertices for the SMPL-H model.
-    # vertex_indices_body = np.int64(
-    #     np.load("src/visualization/vertices/body_vertices.npy")
-    # )
-    # vertex_positions_body = (
-    #     smpl_seq.vertices[:, vertex_indices_body] + smpl_seq.position[np.newaxis]
-    # )
-    # print("Number of Body vertices:", vertex_positions_body.shape[1])
-    # vertices_body = Spheres(
-    #     vertex_positions_body,
-    #     name="Body_Vertices",
-    #     radius=0.005,
-    #     color=(0.0, 0.0, 1.0, 1.0),
-    # )
-    # v.scene.add(vertices_body)
-
-
-    # vertex_indices_body36 = np.int64(
-    #     np.load("src/visualization/vertices/body36_vertices.npy")
-    # )
-    # vertex_positions_body36 = (
-    #     smpl_seq.vertices[:, vertex_indices_body36] + smpl_seq.position[np.newaxis]
-    # )
-    # print("Number of Body36 vertices:", vertex_positions_body36.shape[1])
-    # vertices_body36 = Spheres(
-    #     vertex_positions_body36,
-    #     name="Body36_Vertices",
-    #     radius=0.005,
-    #     color=(0.0, 0.0, 1.0, 1.0),
-    # )
-    # v.scene.add(vertices_body36)
-
-
-    vertex_indices_head = np.int64(
-        np.load("src/visualization/vertices/head_vertices.npy")
-    )
-    vertex_positions_head = (
-        smpl_seq.vertices[:, vertex_indices_head] + smpl_seq.position[np.newaxis]
-    )
-    print("Number of Head vertices:", vertex_positions_head.shape[1])
-    vertices_head = Spheres(
-        vertex_positions_head,
-        name="Head_Vertices",
-        radius=0.002,
-        color=(0.0, 0.0, 1.0, 1.0),
-    )
-    v.scene.add(vertices_head)
-
-
-    # vertex_indices_hand = np.int64(
-    #     np.load("src/visualization/vertices/hand_vertices.npy")
-    # )
-    # vertex_positions_hand = (
-    #     smpl_seq.vertices[:, vertex_indices_hand] + smpl_seq.position[np.newaxis]
-    # )
-    # print("Hand_vertices:", vertex_positions_hand.shape)
-    # vertices_hand = Spheres(
-    #     vertex_positions_hand,
-    #     name="Hand_Vertices",
-    #     radius=0.0015,
-    #     color=(0.0, 1.0, 1.0, 1.0),
-    # )
-    # v.scene.add(vertices_hand)
+    # Display generated vertices for the SMPL-H model.
+    for i in ["body", "hand", "head", "body36"]:
+        # Load the vertex indices from files.
+        vertex_indices = np.int64(
+            np.load(f"src/visualization/vertices/{i}_vertices.npy")
+        )
+        # Extract the positions of the specified vertices and display them.
+        vertex_positions = (
+            smpl_seq.vertices[:, vertex_indices] + smpl_seq.position[np.newaxis]
+        )
+        print(f"Number of {i} vertices:", vertex_positions.shape[1])
+        vertices = Spheres(
+            vertex_positions,
+            name=f"{i}_Vertices",
+            radius=0.004 if i == "body" else 0.003,
+            color=(0.0, 0.0, 1.0, 1.0),
+        )
+        v.scene.add(vertices)
 
     # Display in viewer.
     v.scene.add(smpl_seq)
