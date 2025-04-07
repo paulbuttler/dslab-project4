@@ -6,8 +6,8 @@ import argparse
 import json
 import cv2
 import numpy as np
-from src import utils
 from pathlib import Path
+from src import utils
 from aitviewer.models.smpl import SMPLLayer  # type: ignore
 from aitviewer.renderables.smpl import SMPLSequence  # type: ignore
 from aitviewer.renderables.billboard import Billboard  # type: ignore
@@ -93,7 +93,8 @@ LDMK_CONN = {
     ],
 }
 
-def draw_func(kp2d):
+
+def draw_func(kp2d, thickness=1, ldmk_conn=None):
     """Returns a function that overlays 2D landmarks onto the Billboard image."""
 
     def draw_2d_kp(img, frame=0):
@@ -101,7 +102,7 @@ def draw_func(kp2d):
         current_kp2d = kp2d.copy()
 
         # Draw landmarks using provided function by the paper authors.
-        utils.draw_landmarks(img, current_kp2d, LDMK_CONN["body"])
+        utils.draw_landmarks(img, current_kp2d, ldmk_conn, thickness)
 
         return img
 
@@ -110,10 +111,18 @@ def draw_func(kp2d):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", type=Path, default="data/synth_body")
-    parser.add_argument("--sidx", type=int, default=0)
-    parser.add_argument("--fidx", type=int, default=0)
+    parser.add_argument("--hand", action="store_true", default=False)
+    parser.add_argument("--sidx", type=int, default=None)
+    parser.add_argument("--fidx", type=int, default=None)
+    parser.add_argument("--joints", action="store_true", default=False)
     args = parser.parse_args()
+
+    args.data_dir = Path("data/synth_body" if not args.hand else "data/synth_hand")
+
+    if args.sidx is None:
+        args.sidx = np.random.randint(0, 20000)
+    if args.fidx is None:
+        args.fidx = np.random.randint(0, 5)
 
     meta_file = args.data_dir / f"metadata_{args.sidx:07d}_{args.fidx:03d}.json"
     img_file = args.data_dir / f"img_{args.sidx:07d}_{args.fidx:03d}.jpg"
@@ -131,13 +140,13 @@ if __name__ == '__main__':
     world_to_camera = np.asarray(metadata["camera"]["world_to_camera"])
     camera_to_image = np.asarray(metadata["camera"]["camera_to_image"])
 
-    print("ldmks_2d:", ldmks_2d.shape)
-    print("ldmks_3d_world:", ldmks_3d_world.shape)
-    print("body_identity:", body_identity.shape)
-    print("pose:", pose.shape)
-    print("translation:", translation.shape)
-    print("world_to_camera:", world_to_camera.shape)
-    print("camera_to_image:", camera_to_image.shape)
+    # print("ldmks_2d:", ldmks_2d.shape)
+    # print("ldmks_3d_world:", ldmks_3d_world.shape)
+    # print("body_identity:", body_identity.shape)
+    # print("pose:", pose.shape)
+    # print("translation:", translation.shape)
+    # print("world_to_camera:", world_to_camera.shape)
+    # print("camera_to_image:", camera_to_image.shape)
 
     # Extract pose and shape parameters.
     global_orient = pose[0].reshape(1, -1)
@@ -168,25 +177,58 @@ if __name__ == '__main__':
     # Create an OpenCV camera.
     camera = OpenCVCamera(camera_to_image, world_to_camera[:3], cols, rows, viewer=v)
 
-    # Load the reference image and create a Billboard.
-    billboard = Billboard.from_camera_and_distance(camera, 5.0, cols, rows, [img_rgb], draw_func(ldmks_2d))
+    if args.joints:
+        # Visualize the provided landmarks by the paper authors.
+        spheres = Spheres(
+            ldmks_3d_world,
+            name="Joints",
+            radius=(0.007 if not args.hand else 0.002),
+            color=(1.0, 0.0, 1.0, 1.0),
+        )
+        billboard = Billboard.from_camera_and_distance(
+            camera,
+            4.5,
+            cols,
+            rows,
+            [img_rgb],
+            draw_func(
+                ldmks_2d,
+                1 if not args.hand else 3,
+                LDMK_CONN["body"] if not args.hand else LDMK_CONN["hand"],
+            ),
+        )
 
-    # Display 3D landmarks.
-    spheres = Spheres(ldmks_3d_world, name="Joints", radius=0.008, color=(1.0, 0.0, 1.0, 1.0))
+    else:
+        # Display the set of manually generated vertices.
+        vertex_indices = (
+            np.int64(np.load("src/visualization/vertices/complete_vertices.npy"))
+            if not args.hand
+            else np.int64(np.load("src/visualization/vertices/hand_vertices.npy"))
+        )
+        dense_ldmks_3d = (
+            smpl_seq.vertices[:, vertex_indices] + smpl_seq.position[np.newaxis]
+        )
+        print("Number of Vertices:", dense_ldmks_3d.shape[1])
+        spheres = Spheres(
+            dense_ldmks_3d,
+            name="Dense_Vertices" if not args.hand else "Hand_Vertices",
+            radius=0.005 if not args.hand else 0.002,
+            color=(0.0, 0.0, 1.0, 1.0),
+        )
+        dense_ldmks_2d = utils.project_3d_to_2d(
+            dense_ldmks_3d.squeeze(), camera_to_image, world_to_camera[:3]
+        )
+        billboard = Billboard.from_camera_and_distance(
+            camera,
+            4.5,
+            cols,
+            rows,
+            [img_rgb],
+            draw_func(dense_ldmks_2d, 1 if not args.hand else 4, None),
+        )
 
     v.scene.add(billboard, spheres, smpl_seq, camera)
     v.set_temp_camera(camera)
-
-    # Display the set of generated vertices for the SMPL-H model.
-    vertex_indices = np.int64(np.load("src/visualization/vertices/body_vertices.npy"))
-
-    # Extract the positions of the specified vertices
-    vertex_positions = smpl_seq.vertices[:, vertex_indices] + smpl_seq.position[np.newaxis]
-    print("vertex_positions:", vertex_positions.shape)
-
-    vertices = Spheres(vertex_positions, name="Body_Vertices", radius=0.007, color=(0.0, 0.0, 1.0, 1.0))
-
-    v.scene.add(vertices)
 
     # Viewer settings.
     v.scene.floor.enabled = False
