@@ -1,5 +1,5 @@
 # Access SMPL models.
-smplx_models: "./smplx_models"
+smplx_models: "./data/smplx_models"
 
 # Access to datasets.
 datasets:

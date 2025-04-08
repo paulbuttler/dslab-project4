@@ -1,5 +1,5 @@
 __pycache__/
-data/
+data/raw/
 imgui.ini
-tools/smplh/
+tools/visualize/smplh/
 env/

@@ -7,7 +7,7 @@ import json
 import cv2
 import numpy as np
 from pathlib import Path
-from src import utils
+from src.utils import ldmks
 from aitviewer.models.smpl import SMPLLayer  # type: ignore
 from aitviewer.renderables.smpl import SMPLSequence  # type: ignore
 from aitviewer.renderables.billboard import Billboard  # type: ignore
@@ -102,7 +102,7 @@ def draw_func(kp2d, thickness=1, ldmk_conn=None):
         current_kp2d = kp2d.copy()
 
         # Draw landmarks using provided function by the paper authors.
-        utils.draw_landmarks(img, current_kp2d, ldmk_conn, thickness)
+        ldmks.draw_landmarks(img, current_kp2d, ldmk_conn, thickness)
 
         return img
 
@@ -117,7 +117,9 @@ if __name__ == '__main__':
     parser.add_argument("--joints", action="store_true", default=False)
     args = parser.parse_args()
 
-    args.data_dir = Path("data/synth_body" if not args.hand else "data/synth_hand")
+    args.data_dir = Path(
+        "data/raw/synth_body" if not args.hand else "data/raw/synth_hand"
+    )
 
     if args.sidx is None:
         args.sidx = np.random.randint(0, 20000)
@@ -215,7 +217,7 @@ if __name__ == '__main__':
             radius=0.005 if not args.hand else 0.002,
             color=(0.0, 0.0, 1.0, 1.0),
         )
-        dense_ldmks_2d = utils.project_3d_to_2d(
+        dense_ldmks_2d = ldmks.project_3d_to_2d(
             dense_ldmks_3d.squeeze(), camera_to_image, world_to_camera[:3]
         )
         billboard = Billboard.from_camera_and_distance(
