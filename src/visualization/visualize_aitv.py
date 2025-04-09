@@ -1,19 +1,19 @@
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-
 import argparse
 import json
 import cv2
 import numpy as np
 from pathlib import Path
-from src.utils import ldmks
 from aitviewer.models.smpl import SMPLLayer  # type: ignore
 from aitviewer.renderables.smpl import SMPLSequence  # type: ignore
 from aitviewer.renderables.billboard import Billboard  # type: ignore
 from aitviewer.scene.camera import OpenCVCamera  # type: ignore
 from aitviewer.renderables.spheres import Spheres  # type: ignore
 from aitviewer.viewer import Viewer  # type: ignore
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+from src.utils import ldmks
 
 
 LDMK_CONN = {
@@ -155,14 +155,13 @@ if __name__ == '__main__':
     body_pose = pose[1:22].reshape(1, -1)
     left_hand_pose = pose[22:37].reshape(1, -1)
     right_hand_pose = pose[37:].reshape(1, -1)
-    body_shape = body_identity[:10].reshape(1, -1)
 
     # Create a SMPL sequence.
-    smpl_layer = SMPLLayer(model_type="smplh", gender="neutral")
+    smpl_layer = SMPLLayer(model_type="smplh", gender="neutral", num_betas=16)
     smpl_seq = SMPLSequence(
         smpl_layer=smpl_layer,
         poses_body=body_pose,
-        betas=body_shape,
+        betas=body_identity.reshape(1, -1),
         poses_root=global_orient,
         poses_left_hand=left_hand_pose,
         poses_right_hand=right_hand_pose,

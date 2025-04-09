@@ -1,5 +1,9 @@
+import os
 import cv2
 import numpy as np
+from contextlib import redirect_stdout
+from aitviewer.models.smpl import SMPLLayer  # type: ignore
+from aitviewer.renderables.smpl import SMPLSequence  # type: ignore
 
 def draw_landmarks(
     img: np.ndarray,
@@ -61,3 +65,32 @@ def project_3d_to_2d(
     x_proj = X_cam @ camera_intrinsics.T
     x_proj /= x_proj[:, 2][:, np.newaxis]
     return x_proj[:, :2]
+
+
+def get_3d_landmarks(metadata, vertex_indices):
+    """Generate 3D landmarks from metafile given vertex indices."""
+
+    # Extract metadata.
+    body_identity = np.asarray(metadata["body_identity"])
+    pose = np.asarray(metadata["pose"])
+    translation = np.asarray(metadata["translation"])
+
+    global_orient = pose[0].reshape(1, -1)
+    body_pose = pose[1:22].reshape(1, -1)
+    left_hand_pose = pose[22:37].reshape(1, -1)
+    right_hand_pose = pose[37:].reshape(1, -1)
+
+    # Create a SMPL sequence.
+    with open(os.devnull, "w") as fnull, redirect_stdout(fnull):
+        smpl_layer = SMPLLayer(model_type="smplh", gender="neutral", num_betas=16)
+        smpl_seq = SMPLSequence(
+            smpl_layer=smpl_layer,
+            poses_body=body_pose,
+            betas=body_identity.reshape(1, -1),
+            poses_root=global_orient,
+            poses_left_hand=left_hand_pose,
+            poses_right_hand=right_hand_pose,
+            trans=translation.reshape(1, -1),
+        )
+
+    return smpl_seq.vertices[:, vertex_indices] + smpl_seq.position[np.newaxis]
