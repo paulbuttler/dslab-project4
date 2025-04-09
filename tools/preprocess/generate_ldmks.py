@@ -28,7 +28,7 @@ def main():
         np.load("src/visualization/vertices/body36_vertices.npy")
     )
 
-    landmarks_3d = {}
+    # landmarks_3d = {}
     landmarks_2d = {}
     landmarks_roi = {}
     roi = {}
@@ -54,7 +54,7 @@ def main():
                 ldmks_3d.squeeze(), camera_to_image, world_to_camera[:3]
             )
 
-            landmarks_3d[uid] = ldmks_3d[:-36]
+            # landmarks_3d[uid] = ldmks_3d.squeeze()[:-36]
             landmarks_2d[uid] = ldmks_2d[:-36]
             landmarks_roi[uid] = ldmks_2d[-36:]
 
@@ -62,15 +62,14 @@ def main():
             roi[uid] = extract_roi.compute_roi(ldmks_2d[-36:])
 
     # Save landmarks to a compressed pickle file.
-    with gzip.open("data/annotations/3d_landmarks.pkl.gz", "wb") as f:
-        pickle.dump(landmarks_3d, f, protocol=pickle.HIGHEST_PROTOCOL)
     with gzip.open("data/annotations/2d_landmarks.pkl.gz", "wb") as f:
         pickle.dump(landmarks_2d, f, protocol=pickle.HIGHEST_PROTOCOL)
     with gzip.open("data/annotations/2d_roi_landmarks.pkl.gz", "wb") as f:
         pickle.dump(landmarks_roi, f, protocol=pickle.HIGHEST_PROTOCOL)
     with gzip.open("data/annotations/roi.pkl.gz", "wb") as f:
         pickle.dump(roi, f, protocol=pickle.HIGHEST_PROTOCOL)
-
+    # with gzip.open("data/annotations/3d_landmarks.pkl.gz", "wb") as f:
+    #     pickle.dump(landmarks_3d, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
     main()
