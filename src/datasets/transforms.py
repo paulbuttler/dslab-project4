@@ -1,10 +1,91 @@
 import random
-from PIL import Image
+import torch
+import gzip
+import pickle
+import cv2
+from pathlib import Path
 import numpy as np
+from PIL import Image
 from io import BytesIO
 import kornia.augmentation as K
+from torchvision.io import decode_image
+from kornia.geometry.transform import (
+    get_rotation_matrix2d,
+    warp_affine,
+)
 
-class DatasetTransforms:
+
+def random_roi_transform(
+    img: torch.Tensor, kp2d: torch.Tensor, roi: torch.Tensor, crop_size: float = 256.0
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Randomly apply a rotation, scaling, and translation to the image and keypoints.
+    """
+    device = img.device
+
+    # random perturbation of roi
+    theta = torch.rand(1, device=device) * 50.0 - 25.0
+    scale = (torch.rand(1, device=device) * 0.15 + 1.05).unsqueeze(1).expand(-1, 2)
+    roi_w = roi[:, 2] - roi[:, 0]
+    tx = (torch.rand(1, device=device) * 2 - 1) * 0.05 * roi_w
+    ty = (torch.rand(1, device=device) * 2 - 1) * 0.05 * roi_w
+    translation = torch.stack([tx, ty], dim=1)
+
+    return apply_roi_transform(
+        img, kp2d, roi, theta, scale, translation, crop_size=crop_size
+    )
+
+
+def apply_roi_transform(
+    img: torch.Tensor,
+    kp2d: torch.Tensor,
+    roi: torch.Tensor,
+    angle: torch.Tensor,
+    scale: torch.Tensor,
+    translation: torch.Tensor,
+    crop_size: float = 256.0,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Apply rotation, scaling, and translation around the center of a bounding box,
+    then crop and warp the image and 2D keypoints.
+    """
+    device = img.device
+
+    corners = torch.stack(
+        [roi[:, :2], torch.stack([roi[:, 2], roi[:, 1]], dim=-1), roi[:, 2:]], dim=1
+    ).to(
+        device
+    )  # [B, 3, 2]
+    center = (corners[:, 0] + corners[:, 2]) / 2.0
+
+    # Apply rotation + scaling + translation to the bounding box corners
+    M1 = get_rotation_matrix2d(center=center, angle=angle, scale=scale).to(device)
+    M1[:, :, 2] += translation.to(device)
+
+    corners_h = torch.cat([corners, torch.ones_like(corners[..., :1])], dim=2)
+    src = torch.bmm(M1, corners_h.transpose(1, 2)).transpose(1, 2)
+    src_h = torch.cat([src, torch.ones_like(src[..., :1])], dim=2)
+
+    # Compute affine matrix to map transformed box to canonical crop
+    target = (
+        torch.tensor(
+            [[0.0, 0.0], [crop_size, 0.0], [crop_size, crop_size]], device=device
+        )
+        .unsqueeze(0)
+        .expand(img.shape[0], -1, -1)
+    )
+
+    M2 = torch.linalg.lstsq(src_h, target).solution.permute(0, 2, 1)  # [B, 2, 3]
+
+    # Warp image and keypoints
+    img_warped = warp_affine(img, M2, dsize=(int(crop_size), int(crop_size)))
+    kp2d_h = torch.cat([kp2d, torch.ones_like(kp2d[..., :1])], dim=2)
+    kp2d_warped = torch.bmm(M2, kp2d_h.transpose(1, 2)).transpose(1, 2)  # [B, N, 2]
+
+    return img_warped, kp2d_warped
+
+
+class AppearanceAugmentation:
     def __init__(self, is_hand=False, occluder_library=None):
         self.is_hand = is_hand
         self.occluder_library = occluder_library if occluder_library is not None else []
@@ -70,7 +151,6 @@ class DatasetTransforms:
 
         return img, landmarks
 
-
     def apply_random_transformation(self, img, landmarks):
         # Image
         scale = random.uniform(0.8, 1.2)
@@ -110,3 +190,45 @@ class DatasetTransforms:
         return img, landmarks.tolist()
 
 
+# Test implementation
+if __name__ == "__main__":
+    with gzip.open("data/annotations/body_meta.pkl.gz", "rb") as f:
+        body_meta = pickle.load(f)
+
+    dir = Path("data/raw/synth_body")
+    uid = f"{4:07d}_{3:03d}"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    img = (decode_image(dir / f"img_{uid}.jpg").float().to(device) / 255.0).unsqueeze(
+        0
+    )  # [1, 3, H, W]
+
+    kp2d = torch.tensor(
+        body_meta[uid]["ldmks_2d"], dtype=torch.float32, device=device
+    ).unsqueeze(0)
+
+    roi = torch.tensor(
+        body_meta[uid]["roi"], dtype=torch.float32, device=device
+    ).unsqueeze(
+        0
+    )  # [x_min, y_min, x_max, y_max]
+
+    # random perturbation of roi
+    theta = torch.rand(1, device=device) * 50.0 - 25.0
+    scale = (torch.rand(1, device=device) * 0.15 + 1.05).unsqueeze(1).expand(-1, 2)
+    roi_w = roi[:, 2] - roi[:, 0]
+    tx = (torch.rand(1, device=device) * 2 - 1) * 0.05 * roi_w
+    ty = (torch.rand(1, device=device) * 2 - 1) * 0.05 * roi_w
+    translation = torch.stack([tx, ty], dim=1)
+
+    img, kp2d = apply_roi_transform(img, kp2d, roi, theta, scale, translation)
+
+    # Visualize transformed crop
+    img = img.squeeze(0).permute(1, 2, 0).cpu().numpy()
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+    # Visualize ROI and landmarks on the image
+    for x, y in kp2d.squeeze(0).cpu().numpy():
+        cv2.circle(img, (int(x), int(y)), 1, (0, 255, 0), -1)
+    cv2.imshow("Square ROI", img)
+    cv2.waitKey(0)

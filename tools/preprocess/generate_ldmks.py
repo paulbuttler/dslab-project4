@@ -65,7 +65,7 @@ def main():
             body_ldmks_3d[uid] = ldmks_3d.squeeze()[:-36]
 
     # Save landmarks and relevant metadata to compressed pkl files
-    with gzip.open("data/annotations/meta_body.pkl.gz", "wb") as f:
+    with gzip.open("data/annotations/body_meta.pkl.gz", "wb") as f:
         pickle.dump(body_meta, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     with gzip.open("data/annotations/body_ldmks_roi.pkl.gz", "wb") as f:
