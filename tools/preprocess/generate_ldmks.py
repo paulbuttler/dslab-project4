@@ -28,10 +28,9 @@ def main():
         np.load("src/visualization/vertices/body36_vertices.npy")
     )
 
-    # landmarks_3d = {}
-    landmarks_2d = {}
-    landmarks_roi = {}
-    roi = {}
+    body_meta = {}
+    body_ldmks_roi = {}
+    body_ldmks_3d = {}
 
     for sidx in tqdm(range(args.n_ids), desc="Processing IDs"):
         for fidx in range(5):
@@ -43,9 +42,11 @@ def main():
 
             with open(meta_file, "r") as f:
                 metadata = json.load(f)
-            # Get camera parameters
+
             world_to_camera = np.asarray(metadata["camera"]["world_to_camera"])
             camera_to_image = np.asarray(metadata["camera"]["camera_to_image"])
+            shape = np.array(metadata["body_identity"])
+            pose = np.array(metadata["pose"])
 
             ldmks_3d = ldmks.get_3d_landmarks(
                 metadata, np.concatenate((vertex_indices, vertex_indices_roi))
@@ -54,22 +55,24 @@ def main():
                 ldmks_3d.squeeze(), camera_to_image, world_to_camera[:3]
             )
 
-            # landmarks_3d[uid] = ldmks_3d.squeeze()[:-36]
-            landmarks_2d[uid] = ldmks_2d[:-36]
-            landmarks_roi[uid] = ldmks_2d[-36:]
+            body_meta[uid] = {
+                "shape": shape,
+                "pose": pose,
+                "roi": extract_roi.compute_roi(ldmks_2d[-36:]),
+                "ldmks_2d": ldmks_2d[:-36],
+            }
+            body_ldmks_roi[uid] = ldmks_2d[-36:]
+            body_ldmks_3d[uid] = ldmks_3d.squeeze()[:-36]
 
-            # Compute ROI from sparse landmarks
-            roi[uid] = extract_roi.compute_roi(ldmks_2d[-36:])
+    # Save landmarks and relevant metadata to compressed pkl files
+    with gzip.open("data/annotations/meta_body.pkl.gz", "wb") as f:
+        pickle.dump(body_meta, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    # Save landmarks to a compressed pickle file.
-    with gzip.open("data/annotations/2d_landmarks.pkl.gz", "wb") as f:
-        pickle.dump(landmarks_2d, f, protocol=pickle.HIGHEST_PROTOCOL)
-    with gzip.open("data/annotations/2d_roi_landmarks.pkl.gz", "wb") as f:
-        pickle.dump(landmarks_roi, f, protocol=pickle.HIGHEST_PROTOCOL)
-    with gzip.open("data/annotations/roi.pkl.gz", "wb") as f:
-        pickle.dump(roi, f, protocol=pickle.HIGHEST_PROTOCOL)
-    # with gzip.open("data/annotations/3d_landmarks.pkl.gz", "wb") as f:
-    #     pickle.dump(landmarks_3d, f, protocol=pickle.HIGHEST_PROTOCOL)
+    with gzip.open("data/annotations/body_ldmks_roi.pkl.gz", "wb") as f:
+        pickle.dump(body_ldmks_roi, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    with gzip.open("data/annotations/body_ldmks_3d.pkl.gz", "wb") as f:
+        pickle.dump(body_ldmks_3d, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
     main()

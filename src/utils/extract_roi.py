@@ -53,7 +53,7 @@ if __name__ == "__main__":
         print(f"File not found: {img_file}")
         exit(1)
 
-    with gzip.open("data/annotations/2d_roi_landmarks.pkl.gz", "rb") as f:
+    with gzip.open("data/annotations/body_ldmks_roi.pkl.gz", "rb") as f:
         landmarks_dict = pickle.load(f)
 
     landmarks = landmarks_dict[uid]
