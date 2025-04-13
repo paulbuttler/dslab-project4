@@ -13,7 +13,9 @@ def compute_roi(landmarks, image=None, size=512):
 
     center_x = (x_min + x_max) / 2
     center_y = (y_min + y_max) / 2
-    box_size = max(x_max - x_min, y_max - y_min)
+    # 8% padding seems to be enough to contain all bodyparts even in weird poses
+    box_size = max(x_max - x_min, y_max - y_min) * 1.08
+    box_size = min(size, box_size)
 
     x_min = int(np.floor(center_x - box_size / 2))
     y_min = int(np.floor(center_y - box_size / 2))
@@ -42,7 +44,7 @@ if __name__ == "__main__":
     args.data_dir = Path("data/raw/synth_body")
 
     if args.sidx is None:
-        args.sidx = np.random.randint(0, 20000)
+        args.sidx = np.random.randint(0, 1)
     if args.fidx is None:
         args.fidx = np.random.randint(0, 5)
 
@@ -55,8 +57,11 @@ if __name__ == "__main__":
 
     with gzip.open("data/annotations/body_ldmks_roi.pkl.gz", "rb") as f:
         landmarks_dict = pickle.load(f)
-
     landmarks = landmarks_dict[uid]
+
+    # with gzip.open("data/annotations/body_meta.pkl.gz", "rb") as f:
+    #     body_dict = pickle.load(f)
+    # landmarks = body_dict[uid]["ldmks_2d"]
     img = cv2.imread(str(img_file))
 
     _ = compute_roi(landmarks, img)
