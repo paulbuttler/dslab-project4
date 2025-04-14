@@ -1,16 +1,26 @@
+import os
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
 import torch
 import gzip
 import pickle
 from pathlib import Path
+import timm
 from torchvision.io import decode_image
 from torch.utils.data import Dataset, DataLoader
 from torchvision.utils import make_grid
-from transforms import random_roi_transform, apply_roi_transform, AppearanceAugmentation
+from utils.transforms import random_roi_transform, apply_roi_transform, AppearanceAugmentation, get_timm_transform, get_default_transform
+from utils.rottrans import aa2rot, matrix_to_rotation_6d
 
+class SynDataset(Dataset):
 
-class BodyDataset(Dataset):
-
-    def __init__(self, img_dir, body_meta_dir, mode="train", device="cuda"):
+    def __init__(self, 
+                 img_dir:str, 
+                 body_meta_dir:str, 
+                 model:str=None,
+                 mode="train", 
+                 device="cuda"):
         self.img_dir = img_dir
         with gzip.open(body_meta_dir, "rb") as f:
             self.body_meta = pickle.load(f)
@@ -18,13 +28,14 @@ class BodyDataset(Dataset):
         self.mode = mode
         self.device = device
         self.appearance_aug = AppearanceAugmentation().to(device)
+        self.timm_transform = get_timm_transform(model) if model else get_default_transform()
 
     def __len__(self):
         return len(self.body_meta)
 
     def __getitem__(self, idx):
         uid = self.uids[idx]
-        img_path = self.img_dir / f"img_{uid}.jpg"
+        img_path = os.path.join(self.img_dir, f"img_{uid}.jpg")
 
         img = (decode_image(img_path).float().to(self.device) / 255.0).unsqueeze(0)
 
@@ -41,16 +52,37 @@ class BodyDataset(Dataset):
             img = self.appearance_aug(img)
         else:
             img, kp2d = apply_roi_transform(img, kp2d, roi, "test")
-        pose = self.body_meta[uid]["pose"]
-        shape = self.body_meta[uid]["shape"]
 
-        return img.squeeze(0), kp2d.squeeze(0), pose, shape, uid
+
+        # transform img s.t. it satisfies HRNet input requirements
+        # e.g. size, mean, std
+        img = self.timm_transform(img)
+        # We need to normalize coords of 2D landmarks to [0, 1]!!
+        # This is to control the scale of network output.
+        # Attention: Need to rescale to pixel coords during reconstruction!!
+        resolution = [img.shape[-2], img.shape[-1]]
+        kp2d[..., :, 0] /= resolution[0]
+        kp2d[..., :, 1] /= resolution[1]
+
+        # In addition, we need to convert axis angle to 6d rotation
+        pose = matrix_to_rotation_6d(aa2rot(torch.from_numpy(self.body_meta[uid]["pose"]).to(torch.float32))) # aa -> rotmat -> rot6D
+        shape = torch.from_numpy(self.body_meta[uid]["shape"][:10]).to(torch.float32) # only first 10 elements
+
+        target = {
+            'landmarks': kp2d.squeeze(0),
+            'pose': pose,
+            'shape': shape,
+        }
+
+        return img.squeeze(0), target
 
 # Test the dataset
 if __name__ == "__main__":
-    dataset = BodyDataset(
-        img_dir=Path("data/raw/synth_body"),
-        body_meta_dir="data/annotations/body_meta.pkl.gz",
+    model = timm.create_model('hrnet_w18.ms_aug_in1k', pretrained=True)
+    dataset = SynDataset(
+        img_dir=Path("D:/development/dsl/data/synth_body"),
+        body_meta_dir="D:/development/dsl/data/body_meta.pkl.gz",
+        model=model,
         mode="train",
         device="cuda" if torch.cuda.is_available() else "cpu",
     )
