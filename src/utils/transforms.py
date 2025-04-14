@@ -7,6 +7,8 @@ from kornia.geometry.transform import (
     get_rotation_matrix2d,
     warp_affine,
 )
+from timm.data import resolve_data_config, create_transform
+from torchvision import transforms as T
 
 
 def sample_triangular(low, high, mode, size, device=None):
@@ -164,6 +166,45 @@ class AppearanceAugmentation(nn.Module):
 
         return img
 
+
+def get_timm_transform(model, input_size=(224, 224)):
+    """
+    Params:
+        model: instance of timm model
+        input_size: default input size if not indicated by timm model
+    """
+    try:
+        config = resolve_data_config({}, model=model)
+        transform = create_transform(**config, no_aug=True) ## No augmentation. Otherwise we should change landmarks and smpl prarameters accordingly
+        transform.target_size = config['input_size'][1:]
+        return transform
+    except:
+        return get_default_transform(input_size)
+
+def get_default_transform(input_size=(224, 224), mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+    """
+    default aug transform
+    Params:
+        input_size: (H, W)
+        mean: mean for each channel
+        std: std err for each channel
+    """
+    transform = T.Compose([
+        T.Resize(input_size),
+        T.ColorJitter(brightness=0.2, contrast=0.2),
+        T.ToTensor(),
+        T.Normalize(mean, std)
+    ])
+    transform.target_size = input_size
+    return transform
+
+def denormalize(tensor, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+    if tensor.dim() == 3:
+        tensor = tensor.unsqueeze(0)
+    tensor = tensor.clone()
+    for t, m, s in zip(tensor, mean, std):
+        t.mul_(s).add_(m)
+    return torch.clamp(tensor, 0, 1)
 
 # class AppearanceAugmentation:
 #     def __init__(self, is_hand=False, occluder_library=None):
