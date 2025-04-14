@@ -39,7 +39,7 @@ def random_roi_transform(
     # Use a triangular distribution for simple sampling around the ideal ROI
     angle = sample_triangular(-20.0, 25.0, 0.0, (B,), device=device)
 
-    scale_offset = sample_triangular(-0.05, 0.10, 0.0, (B,), device=device)
+    scale_offset = sample_triangular(-0.03, 0.07, 0.0, (B,), device=device)
     scale = (1.0 + scale_offset).unsqueeze(1).expand(-1, 2)
 
     roi_w = roi[:, 2] - roi[:, 0]
@@ -122,12 +122,14 @@ class AppearanceAugmentation(nn.Module):
         }
         # Built-in Kornia augmentations
         self.colorjitter = K.ColorJitter(
-            hue=0.05, saturation=0.1, p=self.probs["hue_saturation"]
+            hue=0.05, saturation=0.15, p=self.probs["hue_saturation"]
         )
         self.grayscale = K.RandomGrayscale(p=self.probs["grayscale"])
         self.jpeg = K.RandomJPEG(jpeg_quality=(60, 95), p=self.probs["jpeg"])
 
     def forward(self, img: torch.Tensor):
+
+        device = img.device
 
         # Motion blur with kernel size (proportional to image size??)
         if random.random() < self.probs["motion_blur"]:
@@ -145,13 +147,14 @@ class AppearanceAugmentation(nn.Module):
 
         # Contrast adjustment
         if random.random() < self.probs["contrast"]:
-            contrast = random.uniform(-0.15, 0.15)
+            contrast = random.uniform(-0.2, 0.2)
             img = ((img - 0.5) * (1 + contrast) + 0.5).clamp(0, 1)
 
         # Hue and saturation, grayscale and JPEG compression
         img = self.colorjitter(img)
         img = self.grayscale(img)
-        img = self.jpeg(img)
+        # Fix error in kornia package
+        img = self.jpeg(img.to("cpu")).to(device)
 
         # ISO noise
         if random.random() < self.probs["iso_noise"]:

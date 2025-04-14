@@ -17,7 +17,7 @@ class BodyDataset(Dataset):
         self.uids = list(self.body_meta.keys())
         self.mode = mode
         self.device = device
-        self.appearance_aug = AppearanceAugmentation()
+        self.appearance_aug = AppearanceAugmentation().to(device)
 
     def __len__(self):
         return len(self.body_meta)
@@ -65,14 +65,14 @@ if __name__ == "__main__":
 
     img_list = []
     for i in range(15):
-        img = images[i].permute(1, 2, 0).numpy()  # [H, W, C], float32
+        img = images[i].permute(1, 2, 0).cpu().numpy()  # [H, W, C], float32
         img = (img * 255).astype(np.uint8)  # [0, 255], uint8
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
         # Draw keypoints
-        # for x, y in kp2d[i]:
-        #     x, y = int(x.item()), int(y.item())
-        #     cv2.circle(img, (x, y), radius=2, color=(0, 255, 0), thickness=-1)
+        for x, y in kp2d.cpu().numpy()[i]:
+            x, y = int(x.item()), int(y.item())
+            cv2.circle(img, (x, y), radius=2, color=(0, 255, 0), thickness=-1)
 
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = torch.from_numpy(img).permute(2, 0, 1) / 255.0  # Back to [C, H, W], float
