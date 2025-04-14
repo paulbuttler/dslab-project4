@@ -1,0 +1,11 @@
+numpy==2.1.2
+torch==2.6.0+cu126
+torchvision==0.21.0+cu126
+PyYAML==6.0.2
+matplotlib==3.10.1
+timm==1.0.15
+wandb==0.19.9
+pytorch-lightning==2.2.1
+opencv-python==4.11.0.86
+roma==1.5.2.1
+kornia==0.8.0

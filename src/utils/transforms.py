@@ -1,3 +1,4 @@
+import warnings
 import random
 import torch
 import torch.nn as nn
@@ -175,10 +176,11 @@ def get_timm_transform(model, input_size=(224, 224)):
     """
     try:
         config = resolve_data_config({}, model=model)
-        transform = create_transform(**config, no_aug=True) ## No augmentation. Otherwise we should change landmarks and smpl prarameters accordingly
+        transform = create_transform(**config, no_aug=True) ## No augmentation.
         transform.target_size = config['input_size'][1:]
         return transform
     except:
+        warnings.warn("Timm Transform Invalid! Use default transform instead.")
         return get_default_transform(input_size)
 
 def get_default_transform(input_size=(224, 224), mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):

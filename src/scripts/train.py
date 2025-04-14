@@ -4,11 +4,10 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 import os
 import torch
-import numpy as np
 from torch.utils.data import DataLoader, random_split
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
-from utils.datasets import SynDataset
+from utils.dataset import SynDataset
 from models.model import MultiTaskDNN
 from models.smplx import SMPLHLayer
 from utils.config import ConfigManager
@@ -55,9 +54,11 @@ class Trainer:
     def _init_datasets(self):
         """Initialize datasets with splits"""
         full_dataset = SynDataset(
-            root_dir=self.config.data_root,
+            img_dir=self.config.data_root,
+            body_meta_dir=config.meta_file,
             model=self.config.backbone_name,
-            target_keys=['pose', 'shape', 'landmarks']
+            mode='train',
+            device=self.config.device,
         )
         
         # Split dataset
@@ -69,6 +70,9 @@ class Trainer:
             full_dataset, [train_size, val_size, test_size],
             generator=torch.Generator().manual_seed(self.config.seed)
         )
+        self.train_set.mode = 'train'
+        self.val_set.mode = 'test' # no augmentation!
+        self.test_set.mode = 'test' # no augmentation!
         
         # Create dataloaders
         self.train_loader = DataLoader(
