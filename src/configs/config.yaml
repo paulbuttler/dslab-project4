@@ -2,7 +2,6 @@
 name: Run1
 entity: dsl_project4
 project: body_dnn
-# api_key: e3c8522c12e828498bda3d0a9981e4f7bed10fc5 # change to your own :)
 
 # Training parameters
 device: auto
