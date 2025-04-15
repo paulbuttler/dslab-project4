@@ -6,9 +6,9 @@ project: body_dnn
 # Training parameters
 device: auto
 seed: 42
-epochs: 600 # In full experiment, adjust to 600
-batch_size: 32 # In full experiment, adjust to 64 # 80000 train samples, so 1250 iterations per epoch
-val_batch_size: 16 # for val and test
+epochs: 200 # In full experiment, adjust to 600
+batch_size: 64 # In full experiment, adjust to 64 # 80000 train samples, so 1250 iterations per epoch
+val_batch_size: 64 # for val and test
 lr: 0.0001
 min_lr: 0.000001
 weight_decay: 0.01 # In full experiment, use 0.01
@@ -43,8 +43,8 @@ log_interval: 50
 val_interval: 250 # actually could be a little less frequent
 
 # Data parameters
-data_root: D:/development/dsl/data/synth_body ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
-meta_file: D:/temp/dslab-project4/body_meta.pkl.gz ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
+data_root: /cluster/project/hilliges/dsl_4/body/synth_body ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
+meta_file: /cluster/project/hilliges/dsl_4/body/body_meta.pkl.gz ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
 val_ratio: 0.1
 test_ratio: 0.1
 num_workers: 0

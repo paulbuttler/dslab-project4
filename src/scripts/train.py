@@ -11,7 +11,6 @@ from utils.dataset import SynDataset
 from models.model import MultiTaskDNN
 from models.smplx import SMPLHLayer
 from utils.config import ConfigManager
-from utils.transforms import get_timm_transform
 from utils.losses import DNNMultiTaskLoss
 from tqdm import tqdm
 import yaml
@@ -26,11 +25,21 @@ class Trainer:
     def __init__(self, config):
         self.config = config
         self.device = torch.device(config.device)
-
+        # logs and monitor
         self.train_history = {'total': [], 'rotation': [], 'translation': [], 
                             'landmark': [], 'pose': [], 'shape': []}
-        self.val_history = {'total': [], 'rotation': [], 'translation': [], 
+        self.val_history = {'total': [], 'rotation': [], 'translation': [],
                            'landmark': [], 'pose': [], 'shape': []}
+        # Generate unique run name
+        timestamp = datetime.now().strftime('%m%d-%H%M')
+        run_name = f"{timestamp}_{config.name}_{str(uuid.uuid4())[:5]}"
+        # Init wandb logger
+        wandb_logger = WandbLogger(
+            name=run_name,
+            project=config.project,
+            entity=config.entity,
+        )
+        wandb_logger.experiment.config.update(vars(config))  # log all hyperparams
         self.wandb_logger = wandb_logger
         
         # Initialize components
@@ -55,7 +64,7 @@ class Trainer:
         """Initialize datasets with splits"""
         full_dataset = SynDataset(
             img_dir=self.config.data_root,
-            body_meta_dir=config.meta_file,
+            body_meta_dir=self.config.meta_file,
             model=self.config.backbone_name,
             mode='train',
             device=self.config.device,
@@ -331,19 +340,6 @@ if __name__ == "__main__":
     # Save config for reproducibility
     with open(os.path.join(config.save_dir, 'config.yaml'), 'w') as f:
         yaml.dump(vars(config), f)
-
-    # Generate unique run name
-    timestamp = datetime.now().strftime('%m%d-%H%M')
-    run_name = f"{timestamp}_{config.name}_{str(uuid.uuid4())[:5]}"
-
-    # Init wandb logger
-    wandb_logger = WandbLogger(
-        name=run_name,
-        project=config.project,
-        entity=config.entity,
-    )
-    wandb_logger.experiment.config.update(vars(config))  # log all hyperparams
-
     
     # Initialize and run trainer
     trainer = Trainer(config)

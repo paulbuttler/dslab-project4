@@ -53,16 +53,15 @@ class SynDataset(Dataset):
         else:
             img, kp2d = apply_roi_transform(img, kp2d, roi, "test")
 
-
-        # transform img s.t. it satisfies HRNet input requirements
-        # e.g. size, mean, std
-        img = self.timm_transform(img)
         # We need to normalize coords of 2D landmarks to [0, 1]!!
         # This is to control the scale of network output.
         # Attention: Need to rescale to pixel coords during reconstruction!!
         resolution = [img.shape[-2], img.shape[-1]]
         kp2d[..., :, 0] /= resolution[0]
         kp2d[..., :, 1] /= resolution[1]
+        # transform img s.t. it satisfies HRNet input requirements
+        # e.g. size, mean, std
+        img = self.timm_transform(img)
 
         # In addition, we need to convert axis angle to 6d rotation
         pose = matrix_to_rotation_6d(aa2rot(torch.from_numpy(self.body_meta[uid]["pose"]).to(torch.float32))) # aa -> rotmat -> rot6D
