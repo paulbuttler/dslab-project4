@@ -1,14 +1,15 @@
 #!/bin/bash
 
 #SBATCH --job-name=train
-#SBATCH -n 4
-#SBATCH --mem-per-cpu=4000
-#SBATCH --time=48:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=6
+#SBATCH --mem-per-cpu=2G
 #SBATCH --gpus=rtx_3090:1
+#SBATCH --time=48:00:00
 #SBATCH --output=training_log_%j.out
 
 source ~/.bashrc
 
 workon dslab
-cd dslab-project4/src
+cd src
 python scripts/train.py

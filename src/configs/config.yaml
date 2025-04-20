@@ -7,9 +7,9 @@ project: body_dnn
 device: auto
 seed: 42
 epochs: 100 # In full experiment, adjust to 600
-batch_size: 64 # In full experiment, adjust to 64 # 80000 train samples, so 1250 iterations per epoch
-accumulation_steps: 4 # simulates larger batch_size
-val_batch_size: 64 # for val and test
+batch_size: 50 # In full experiment, adjust to 64 # 80000 train samples, so 1250 iterations per epoch
+accumulation_steps: 5 # simulates larger batch_size
+val_batch_size: 50 # for val and test
 lr: 0.0001
 weight_decay: 0.0001 # In full experiment, use 0.01
 scheduler_type: cosine # In full experiment, use cosine
@@ -37,8 +37,8 @@ rot_weight: 1.0
 shape_weight: 1.0
 
 # log settings 
-log_interval: 100 
-val_interval: 400
+log_interval: 200 
+val_interval: 800
 
 # Data parameters
 data_root: /cluster/project/hilliges/dsl_4/body/synth_body ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
