@@ -23,7 +23,6 @@ import multiprocessing as mp
 
 mp.set_start_method("spawn", force=True)
 
-
 class Trainer:
     def __init__(self, config):
         self.config = config
@@ -108,7 +107,7 @@ class Trainer:
             self.val_set,
             batch_size=self.config.val_batch_size,
             shuffle=False,
-            num_workers=self.config.num_workers,
+            num_workers=0,
             drop_last=False,
         )
         if self.test_set is not None:
@@ -116,7 +115,7 @@ class Trainer:
                 self.test_set,
                 batch_size=self.config.val_batch_size,
                 shuffle=False,
-                num_workers=self.config.num_workers,
+                num_workers=0,
                 drop_last=False,
             )
 
