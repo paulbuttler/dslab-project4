@@ -19,6 +19,10 @@ from pytorch_lightning.loggers import WandbLogger
 from datetime import datetime
 import uuid
 
+import multiprocessing as mp
+
+mp.set_start_method("spawn", force=True)
+
 
 class Trainer:
     def __init__(self, config):
