@@ -1,6 +1,8 @@
 __pycache__/
-data/raw/
-data/annotations/
+.vscode/
+data/
 imgui.ini
 tools/visualize/smplh/
 env/
+wandb/
+checkpoints/
