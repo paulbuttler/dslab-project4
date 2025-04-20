@@ -1,12 +1,5 @@
 # Access SMPL models.
-smplx_models: "./data/smplx_models"
-
-# Access to datasets.
-datasets:
-  amass:
-    "./data/amass"
-  synth_body:
-    "./data/synth_body"
+smplx_models: "./src/models/smplx/params"
 
 # Pytorch configuration.
 device: "cpu"
