@@ -1,24 +1,23 @@
-import os
 import yaml
 import torch
 import warnings
 from types import SimpleNamespace
-from typing import Union
 
 class ConfigManager:
-    def __init__(self, config_path: str = './configs/config.yaml'):
+
+    def __init__(self, config_path: str = "./configs/config.yaml"):
         self.config_path = config_path
         self.config = self._load_config()
         self._process_device_config()
         self._validate_config()
         # print(f"DEBUG - lr type: {type(self.config.lr)}")
-        
+
     def _load_config(self) -> SimpleNamespace:
         # load and parse yaml file
         with open(self.config_path, 'r') as f:
             config_dict = yaml.safe_load(f)
         return SimpleNamespace(**config_dict)
-    
+
     def _process_device_config(self):
         # device config
         if self.config.device == 'auto':
@@ -31,10 +30,10 @@ class ConfigManager:
                     RuntimeWarning,
                     stacklevel=2
                 )
-            
+
         # cuDNN optimization
         torch.backends.cudnn.benchmark = self.config.cudnn_benchmark
-    
+
     def _validate_config(self):
         # validate config
         if 'cuda' in self.config.device:
@@ -46,7 +45,7 @@ class ConfigManager:
 
         if self.config.batch_size <= 0:
             raise ValueError("batch_size should be greater or equal to 0!")
-    
+
     def get_config(self) -> SimpleNamespace:
         # get unltimate config
         return self.config

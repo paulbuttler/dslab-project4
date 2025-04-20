@@ -1,33 +1,31 @@
 # wandb settings
-name: Run1
+name: Test_Run
 entity: dsl_project4
 project: body_dnn
 
 # Training parameters
 device: auto
 seed: 42
-epochs: 200 # In full experiment, adjust to 600
+epochs: 100 # In full experiment, adjust to 600
 batch_size: 64 # In full experiment, adjust to 64 # 80000 train samples, so 1250 iterations per epoch
+accumulation_steps: 4 # simulates larger batch_size
 val_batch_size: 64 # for val and test
 lr: 0.0001
-min_lr: 0.000001
-weight_decay: 0.01 # In full experiment, use 0.01
+weight_decay: 0.0001 # In full experiment, use 0.01
 scheduler_type: cosine # In full experiment, use cosine
-step_per_period: 20 # param for cosine annealing scheduler
-iteration_per_scheduler_step: 200 ### NEED TO TUNE; Now scheduler takes step after every 200 steps
-backbone_lr: 0.00001
+min_lr: 0.00005 # In full experiment, use 0.000001
+step_per_period: 20 # param for cosine annealing warm restarts scheduler
 
 # Model parameters
-backbone_name: hrnet_w18.ms_aug_in1k # In full experiment, use hrnet_w18.ms_aug_in1k; for light-weight test, use hrnet_w18_small.ms_in1k
+backbone_name: hrnet_w48.ms_in1k # In full experiment, use hrnet_w18.ms_aug_in1k; for light-weight test, use hrnet_w18_small.ms_in1k
 pretrained: True
-freeze_backbone: False # I think we need to fix backbone params, though
 smplh_model_path: ./models/smplx/params/smplh
-num_backbone_features: 512
+backbone_feat_dim: 512
 mlp_head_hidden_dim: 512
 
 # Targets
 num_landmarks: 1100
-num_pose_params: 52
+num_pose_params: 21
 num_shape_params: 10
 
 # Loss weights
@@ -38,18 +36,18 @@ trans_weight: 2.0
 rot_weight: 1.0
 shape_weight: 1.0
 
-# log settings
-log_interval: 50
-val_interval: 250 # actually could be a little less frequent
+# log settings 
+log_interval: 100 
+val_interval: 400
 
 # Data parameters
 data_root: /cluster/project/hilliges/dsl_4/body/synth_body ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
 meta_file: /cluster/project/hilliges/dsl_4/body/body_meta.pkl.gz ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
 val_ratio: 0.1
-test_ratio: 0.1
+test_ratio: 0.0
 num_workers: 0
 
 # System parameters
 cudnn_benchmark: True
-save_dir: ./checkpoints
-vis_dir: ./visualization
+save_dir: ../checkpoints
+vis_dir: ../visualization
