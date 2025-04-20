@@ -45,7 +45,7 @@ data_root: /cluster/project/hilliges/dsl_4/body/synth_body ### ATTN: MAKE SURE T
 meta_file: /cluster/project/hilliges/dsl_4/body/body_meta.pkl.gz ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
 val_ratio: 0.1
 test_ratio: 0.0
-num_workers: 0
+num_workers: 4
 
 # System parameters
 cudnn_benchmark: True
