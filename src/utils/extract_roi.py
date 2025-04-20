@@ -44,7 +44,7 @@ if __name__ == "__main__":
     args.data_dir = Path("data/raw/synth_body")
 
     if args.sidx is None:
-        args.sidx = np.random.randint(0, 1)
+        args.sidx = np.random.randint(0, 1000)
     if args.fidx is None:
         args.fidx = np.random.randint(0, 5)
 

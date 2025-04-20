@@ -9,11 +9,7 @@ from aitviewer.renderables.billboard import Billboard  # type: ignore
 from aitviewer.scene.camera import OpenCVCamera  # type: ignore
 from aitviewer.renderables.spheres import Spheres  # type: ignore
 from aitviewer.viewer import Viewer  # type: ignore
-import sys
-import os
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from src.utils import ldmks
+from utils import ldmks
 
 
 LDMK_CONN = {
@@ -122,7 +118,7 @@ if __name__ == '__main__':
     )
 
     if args.sidx is None:
-        args.sidx = np.random.randint(0, 20000)
+        args.sidx = np.random.randint(0, 1000)
     if args.fidx is None:
         args.fidx = np.random.randint(0, 5)
 

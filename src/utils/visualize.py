@@ -5,7 +5,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 import matplotlib.pyplot as plt
 import torch
 
-from utils.transforms import denormalize
+from datasets.transforms import denormalize
 
 def plot_landmarks_with_uncertainty(image_tensor, gt_landmarks, pred_landmarks, target_size, save_path=None):
     """

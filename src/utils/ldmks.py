@@ -1,3 +1,5 @@
+"""Parts of the code are copied from the repository: https://github.com/microsoft/SynthMoCap released under the MIT license."""
+
 import os
 import cv2
 import numpy as np
@@ -12,7 +14,7 @@ def draw_landmarks(
     thickness: int = 1,
     color: tuple[int, int, int] = (255, 255, 255),
 ) -> None:
-    """Draws 2D landmarks on an image with connections. Adapted from microsoft/SynthMoCap."""
+    """Draws 2D landmarks on an image with connections."""
     if img.dtype != np.uint8:
         raise ValueError("Image must be uint8")
     if np.any(np.isnan(ldmks_2d)):
