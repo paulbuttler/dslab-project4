@@ -5,12 +5,7 @@ import gzip
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
-
-import sys
-import os
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from src.utils import ldmks, extract_roi
+from utils import ldmks, extract_roi
 
 
 def main():
