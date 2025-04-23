@@ -1,13 +1,9 @@
-import sys
 import os
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent))
-import matplotlib.pyplot as plt
 import torch
-
+import matplotlib.pyplot as plt
 from utils.config import ConfigManager
 from scripts.train import Trainer
-from utils.transforms import denormalize
+from datasets.transforms import denormalize
 
 import wandb
 

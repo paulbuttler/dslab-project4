@@ -17,7 +17,7 @@ class MultiTaskDNN(nn.Module):
 
     def __init__(
         self,
-        backbone_name="hrnet_w18.ms_aug_in1k",
+        backbone_name="hrnet_w48.ms_in1k",
         pretrained=True,
         num_landmarks=1100,
         num_pose_params=21,
