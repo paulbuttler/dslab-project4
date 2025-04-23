@@ -1,8 +1,8 @@
 __pycache__/
 .vscode/
 data/
-imgui.ini
-tools/visualize/smplh/
-env/
 wandb/
-checkpoints/
+experiments/body/
+tools/visualize/smplh/
+src/models/smplx/params/
+imgui.ini
