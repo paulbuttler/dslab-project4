@@ -1,5 +1,6 @@
 import argparse
 import json
+import torch
 import pickle
 import gzip
 import numpy as np
@@ -51,17 +52,18 @@ def main():
             )
 
             body_meta[uid] = {
-                "shape": shape,
-                "pose": pose,
-                "roi": extract_roi.compute_roi(ldmks_2d[-36:]),
-                "ldmks_2d": ldmks_2d[:-36],
+                "shape": torch.tensor(shape, dtype=torch.float32),
+                "pose": torch.tensor(pose, dtype=torch.float32),
+                "roi": torch.tensor(
+                    extract_roi.compute_roi(ldmks_2d[-36:]), dtype=torch.float32
+                ),
+                "ldmks_2d": torch.tensor(ldmks_2d[:-36], dtype=torch.float32),
             }
             body_ldmks_roi[uid] = ldmks_2d[-36:]
             body_ldmks_3d[uid] = ldmks_3d.squeeze()[:-36]
 
-    # Save landmarks and relevant metadata to compressed pkl files
-    with gzip.open("data/annotations/body_meta.pkl.gz", "wb") as f:
-        pickle.dump(body_meta, f, protocol=pickle.HIGHEST_PROTOCOL)
+    # Save landmarks and relevant metadata to compressed files
+    torch.save(body_meta, "data/annotations/body_meta.pt")
 
     with gzip.open("data/annotations/body_ldmks_roi.pkl.gz", "wb") as f:
         pickle.dump(body_ldmks_roi, f, protocol=pickle.HIGHEST_PROTOCOL)
