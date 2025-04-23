@@ -41,7 +41,7 @@ def draw_landmarks(
                 tuple(ldmk + 1),
                 thickness + (1 if connectivity is not None else 0),
                 (0, 0, 0),
-                -1,
+                1,
                 cv2.LINE_AA,
             )
             cv2.circle(
@@ -49,7 +49,7 @@ def draw_landmarks(
                 tuple(ldmk),
                 thickness + (1 if connectivity is not None else 0),
                 color,
-                -1,
+                1,
                 cv2.LINE_AA,
             )
 
