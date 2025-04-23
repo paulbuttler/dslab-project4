@@ -1,4 +1,3 @@
-import warnings
 import random
 import torch
 import torch.nn as nn
@@ -47,7 +46,7 @@ def random_roi_transform(
     # Use a triangular distribution for simple sampling around the ideal ROI
     angle = sample_triangular(-20.0, 25.0, 0.0, (B,), device=device)
 
-    scale_offset = sample_triangular(-0.03, 0.07, 0.0, (B,), device=device)
+    scale_offset = sample_triangular(-0.04, 0.10, 0.0, (B,), device=device)
     scale = (1.0 + scale_offset).unsqueeze(1).expand(-1, 2)
 
     roi_w = roi[:, 2] - roi[:, 0]
@@ -120,13 +119,13 @@ class AppearanceAugmentation(nn.Module):
     def __init__(self):
         super().__init__()
         self.probs = {
-            "motion_blur": 0.2,
+            "motion_blur": 0.1,
             "brightness": 0.4,
             "contrast": 0.4,
-            "hue_saturation": 0.4,
+            "hue_saturation": 0.3,
             "grayscale": 0.05,
-            "jpeg": 0.3,
-            "iso_noise": 0.3,
+            "jpeg": 0.2,
+            "iso_noise": 0.2,
         }
         # Built-in Kornia augmentations
         self.colorjitter = K.ColorJitter(
@@ -171,4 +170,3 @@ class AppearanceAugmentation(nn.Module):
             ).clamp(0, 1)
 
         return img
-

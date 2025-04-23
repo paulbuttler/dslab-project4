@@ -1,26 +1,23 @@
 import os
 import torch
-import gzip
-import pickle
 from pathlib import Path
 import kornia.augmentation as K
 from torchvision.io import decode_image
 from torch.utils.data import Dataset, DataLoader
 from torchvision.utils import make_grid
 from datasets.transforms import denormalize, random_roi_transform, apply_roi_transform, AppearanceAugmentation
-from utils.rottrans import aa2rot, matrix_to_rotation_6d
 
 class SynDataset(Dataset):
 
-    def __init__(self, 
-                 img_dir:str, 
-                 body_meta_dir:str, 
-                 mode="train", 
-                 device="cuda"):
+    def __init__(
+        self,
+        img_dir: str,
+        body_meta_dir: str,
+        indices=None,
+        mode="train",
+        device="cuda",
+    ):
         self.img_dir = img_dir
-        with gzip.open(body_meta_dir, "rb") as f:
-            self.body_meta = pickle.load(f)
-        self.uids = list(self.body_meta.keys())
         self.train = True if mode=="train" else False
         self.device = device
         self.appearance_aug = AppearanceAugmentation().to(device) if self.train else None
@@ -29,8 +26,18 @@ class SynDataset(Dataset):
             std=torch.tensor([0.229, 0.224, 0.225])
         ).to(device)
 
+        full_body_meta = torch.load(body_meta_dir)
+        all_uids = list(full_body_meta.keys())
+
+        self.uids = [all_uids[i] for i in indices] if indices is not None else all_uids
+        self.body_meta = (
+            {uid: full_body_meta[uid] for uid in self.uids}
+            if indices is not None
+            else full_body_meta
+        )
+
     def __len__(self):
-        return len(self.body_meta)
+        return len(self.uids)
 
     def __getitem__(self, idx):
         uid = self.uids[idx]
@@ -38,13 +45,9 @@ class SynDataset(Dataset):
 
         img = (decode_image(img_path).float().to(self.device) / 255.0).unsqueeze(0)
 
-        kp2d = torch.tensor(
-            self.body_meta[uid]["ldmks_2d"], dtype=torch.float32, device=self.device
-        ).unsqueeze(0)
+        kp2d = self.body_meta[uid]["ldmks_2d"].to(self.device).unsqueeze(0)
 
-        roi = torch.tensor(
-            self.body_meta[uid]["roi"], dtype=torch.float32, device=self.device
-        ).unsqueeze(0)
+        roi = self.body_meta[uid]["roi"].to(self.device).unsqueeze(0)
 
         if self.train and self.appearance_aug:
             img, kp2d = random_roi_transform(img, kp2d, roi, "train")
@@ -59,8 +62,12 @@ class SynDataset(Dataset):
         kp2d = kp2d/img.shape[-1]
 
         # In addition, we need to convert axis angle to 6d rotation
-        pose = torch.from_numpy(self.body_meta[uid]["pose"]).to(device=self.device, dtype=torch.float32) # Local axis angle representation!!
-        shape = torch.from_numpy(self.body_meta[uid]["shape"][:10]).to(device=self.device, dtype=torch.float32) # only first 10 elements
+        pose = self.body_meta[uid]["pose"].to(
+            self.device
+        )  # Local axis angle representation!!
+        shape = self.body_meta[uid]["shape"][:10].to(
+            self.device
+        )  # only first 10 elements
 
         target = {
             'landmarks': kp2d.squeeze(0),
@@ -68,27 +75,26 @@ class SynDataset(Dataset):
             'shape': shape,
         }
 
-        return img.squeeze(0), target
+        return img.squeeze(0), target, uid
 
-# Test the dataset
+# Test dataset and augmentation
 if __name__ == "__main__":
     dataset = SynDataset(
         img_dir=Path("data/raw/synth_body"),
-        body_meta_dir="data/annotations/body_meta.pkl.gz",
+        body_meta_dir="data/annotations/body_meta.pt",
         mode="train",
         device="cuda" if torch.cuda.is_available() else "cpu",
     )
-    dataloader = DataLoader(dataset, batch_size=64, shuffle=False)
+    dataloader = DataLoader(dataset, batch_size=18, shuffle=False)
 
     print(f"Number of samples: {len(dataset)}")
     print(f"Number of batches: {len(dataloader)}")
 
-    images, labels = next(iter(dataloader))
+    images, labels, uids = next(iter(dataloader))
     print(f"Image shape: {images.shape}")
 
     import cv2
 
-    images, labels = next(iter(dataloader))
     images = denormalize(images)     # [B, C, H, W]
     kp2d = (labels["landmarks"] * images.shape[-1]).cpu().numpy()
 

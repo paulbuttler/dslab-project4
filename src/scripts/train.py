@@ -6,7 +6,7 @@ from torch.optim.lr_scheduler import (
     CosineAnnealingWarmRestarts,
     CosineAnnealingLR,
 )
-from datasets.dataset import SynDataset
+from datasets.synth_dataset import SynDataset
 from models.model import MultiTaskDNN
 from models.smplx import SMPLHLayer
 from utils.config import ConfigManager
@@ -70,47 +70,60 @@ class Trainer:
             mode="train",
             device=self.config.device,
         )
+        full_length = 95575
 
-        # Split dataset
-        val_size = int(len(full_dataset) * self.config.val_ratio)
-        test_size = int(len(full_dataset) * self.config.test_ratio)
-        train_size = len(full_dataset) - val_size - test_size
+        # Create dataset splits
+        val_size = int(full_length * self.config.val_ratio)
+        test_size = int(full_length * self.config.test_ratio)
+        train_size = full_length - val_size - test_size
 
-        if test_size == 0:
-            self.train_set, self.val_set = random_split(
-                full_dataset,
-                [train_size, val_size],
-                generator=torch.Generator().manual_seed(self.config.seed),
+        all_indices = torch.randperm(
+            full_length, generator=torch.Generator().manual_seed(config.seed)
+        )
+        train_indices = all_indices[:train_size]
+        val_indices = all_indices[train_size : train_size + val_size]
+
+        # Create datasets
+        train_set = SynDataset(
+            img_dir=self.config.data_root,
+            body_meta_dir=self.config.meta_file,
+            indices=train_indices,
+            mode="train",
+            device=self.config.device,
+        )
+        val_set = SynDataset(
+            img_dir=self.config.data_root,
+            body_meta_dir=self.config.meta_file,
+            indices=val_indices,
+            mode="test",
+            device=self.config.device,
+        )
+        if test_size > 0:
+            test_indices = all_indices[train_size + val_size :]
+            self.test_set = SynDataset(
+                img_dir=self.config.data_root,
+                body_meta_dir=self.config.meta_file,
+                indices=test_indices,
+                mode="test",
+                device=self.config.device,
             )
-            self.test_set = None  # No test set
-        else:
-            self.train_set, self.val_set, self.test_set = random_split(
-                full_dataset,
-                [train_size, val_size, test_size],
-                generator=torch.Generator().manual_seed(self.config.seed),
-            )
-        self.train_set.mode = 'train'
-        self.val_set.mode = 'test' # no augmentation!
-
-        if self.test_set is not None:
-            self.test_set.mode = "test"  # no augmentation!
 
         # Create dataloaders
         self.train_loader = DataLoader(
-            self.train_set,
+            train_set,
             batch_size=self.config.batch_size,
             shuffle=True,
             num_workers=self.config.num_workers,
             drop_last=True,
         )
         self.val_loader = DataLoader(
-            self.val_set,
+            val_set,
             batch_size=self.config.val_batch_size,
             shuffle=False,
             num_workers=0,
             drop_last=False,
         )
-        if self.test_set is not None:
+        if test_size > 0:
             self.test_loader = DataLoader(
                 self.test_set,
                 batch_size=self.config.val_batch_size,
@@ -118,6 +131,8 @@ class Trainer:
                 num_workers=0,
                 drop_last=False,
             )
+        else:
+            self.test_loader = None
 
     def _init_model(self):
         """Initialize model and move to device"""
@@ -183,7 +198,7 @@ class Trainer:
 
         self.optimizer.zero_grad()
 
-        for batch_idx, (images, targets) in enumerate(
+        for batch_idx, (images, targets, _) in enumerate(
             tqdm(self.train_loader, desc=f"Epoch {epoch} Training", leave=False)
         ):
             images = images.to(self.device)
@@ -276,7 +291,9 @@ class Trainer:
         val_loss = {'total': 0, 'landmark': 0, 'pose': 0, 'shape': 0, 'translation': 0, 'rotation': 0}
 
         with torch.no_grad():
-            for images, targets in tqdm(self.val_loader, desc="Validating", leave=False):
+            for images, targets, _ in tqdm(
+                self.val_loader, desc="Validating", leave=False
+            ):
                 images = images.to(self.device)
                 outputs = self.model(images)
                 loss_dict = self._compute_loss(outputs, targets)
@@ -310,17 +327,22 @@ class Trainer:
                     }
                 )
 
-            if val_loss['total'] < best_loss:
-                best_loss = val_loss['total']
+            if val_loss["total"] < best_loss or epoch % 50 == 0:
+                if val_loss["total"] < best_loss:
+                    model_name = "best_model"
+                else:
+                    model_name = f"model_epoch_{epoch}"
+
+                loss = val_loss["total"]
                 torch.save(
                     {
                         "epoch": epoch,
                         "model_state_dict": self.model.state_dict(),
                         "optimizer_state_dict": self.optimizer.state_dict(),
-                        "best_loss": best_loss,
+                        "loss": loss,
                     },
                     os.path.join(
-                        self.config.save_dir, f"best_model{self.run_name}.pth"
+                        self.config.save_dir, f"{model_name}_{self.run_name}.pth"
                     ),
                 )
 
@@ -335,7 +357,7 @@ class Trainer:
         test_loss = {'total': 0, 'landmark': 0, 'pose': 0, 'shape': 0, 'translation': 0, 'rotation': 0}
 
         with torch.no_grad():
-            for images, targets in tqdm(self.test_loader, desc="Testing"):
+            for images, targets, _ in tqdm(self.test_loader, desc="Testing"):
                 images = images.to(self.device)
                 outputs = self.model(images)
                 loss_dict = self._compute_loss(outputs, targets)
@@ -359,12 +381,18 @@ if __name__ == "__main__":
     # Create save directory
     os.makedirs(config.save_dir, exist_ok=True)
 
+    # Initialize trainer
+    trainer = Trainer(config)
+
     # Save config for reproducibility
-    with open(os.path.join(config.save_dir, 'config.yaml'), 'w') as f:
+    with open(
+        os.path.join(config.save_dir, f"config_{trainer.run_name}.yaml"), "w"
+    ) as f:
         yaml.dump(vars(config), f)
 
-    # Initialize and run trainer
-    trainer = Trainer(config)
+    # Run training
     trainer.train()
-    # trainer.test()
+    if trainer.test_loader is not None:
+        trainer.test()
+
     wandb.finish()
