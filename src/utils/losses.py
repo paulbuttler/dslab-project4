@@ -1,7 +1,3 @@
-# loss.py
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent))
 import torch
 import torch.nn as nn
 from utils.rottrans import rotation_6d_to_matrix, matrix_to_rotation_6d, local_to_global
