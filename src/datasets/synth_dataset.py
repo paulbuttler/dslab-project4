@@ -43,13 +43,18 @@ class SynDataset(Dataset):
         uid = self.uids[idx]
         img_path = os.path.join(self.img_dir, f"img_{uid}.jpg")
 
-        img = (decode_image(img_path).float().to(self.device) / 255.0).unsqueeze(0)
+        img = (decode_image(img_path).float() / 255.0).unsqueeze(0)
+        kp2d = self.body_meta[uid]["ldmks_2d"].unsqueeze(0)
+        roi = self.body_meta[uid]["roi"].unsqueeze(0)
+        pose = self.body_meta[uid]["pose"]  # Local axis angle representation!!
+        shape = self.body_meta[uid]["shape"][:10]  # only first 10 elements
 
-        kp2d = self.body_meta[uid]["ldmks_2d"].to(self.device).unsqueeze(0)
+        # Move to device for augmentation
+        img = img.to(self.device)
+        kp2d = kp2d.to(self.device)
+        roi = roi.to(self.device)
 
-        roi = self.body_meta[uid]["roi"].to(self.device).unsqueeze(0)
-
-        if self.train and self.appearance_aug:
+        if self.train and self.appearance_aug is not None:
             img, kp2d = random_roi_transform(img, kp2d, roi, "train")
             img = self.appearance_aug(img)
         else:
@@ -61,18 +66,10 @@ class SynDataset(Dataset):
         # Normalize 2D landmark coordinates to [0, 1]
         kp2d = kp2d/img.shape[-1]
 
-        # In addition, we need to convert axis angle to 6d rotation
-        pose = self.body_meta[uid]["pose"].to(
-            self.device
-        )  # Local axis angle representation!!
-        shape = self.body_meta[uid]["shape"][:10].to(
-            self.device
-        )  # only first 10 elements
-
         target = {
-            'landmarks': kp2d.squeeze(0),
-            'pose': pose,
-            'shape': shape,
+            "landmarks": kp2d.squeeze(0),
+            "pose": pose.to(self.device),
+            "shape": shape.to(self.device),
         }
 
         return img.squeeze(0), target, uid
