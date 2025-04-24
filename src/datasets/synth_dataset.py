@@ -12,13 +12,13 @@ class SynDataset(Dataset):
     def __init__(
         self,
         img_dir: str,
-        body_meta_dir: str,
+        body_meta,  # can be a path or a dict
         indices=None,
         mode="train",
         device="cuda",
     ):
         self.img_dir = img_dir
-        self.train = True if mode=="train" else False
+        self.train = mode == "train"
         self.device = device
         self.appearance_aug = AppearanceAugmentation().to(device) if self.train else None
         self.normalize = K.Normalize(
@@ -26,14 +26,16 @@ class SynDataset(Dataset):
             std=torch.tensor([0.229, 0.224, 0.225])
         ).to(device)
 
-        full_body_meta = torch.load(body_meta_dir)
-        all_uids = list(full_body_meta.keys())
+        if isinstance(body_meta, str):
+            body_meta = torch.load(body_meta, map_location="cpu")
+
+        all_uids = list(body_meta.keys())
 
         self.uids = [all_uids[i] for i in indices] if indices is not None else all_uids
         self.body_meta = (
-            {uid: full_body_meta[uid] for uid in self.uids}
+            {uid: body_meta[uid] for uid in self.uids}
             if indices is not None
-            else full_body_meta
+            else body_meta
         )
 
     def __len__(self):
@@ -78,7 +80,7 @@ class SynDataset(Dataset):
 if __name__ == "__main__":
     dataset = SynDataset(
         img_dir=Path("data/raw/synth_body"),
-        body_meta_dir="data/annotations/body_meta.pt",
+        body_meta="data/annotations/body_meta.pt",
         mode="train",
         device="cuda" if torch.cuda.is_available() else "cpu",
     )

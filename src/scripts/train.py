@@ -80,17 +80,19 @@ class Trainer:
         train_indices = all_indices[:train_size]
         val_indices = all_indices[train_size : train_size + val_size]
 
+        meta = torch.load(self.config.meta_file, map_location="cpu")
+
         # Create datasets
         train_set = SynDataset(
             img_dir=self.config.data_root,
-            body_meta_dir=self.config.meta_file,
+            body_meta=meta,
             indices=train_indices,
             mode="train",
             device=self.config.device,
         )
         val_set = SynDataset(
             img_dir=self.config.data_root,
-            body_meta_dir=self.config.meta_file,
+            body_meta=meta,
             indices=val_indices,
             mode="test",
             device=self.config.device,
@@ -99,7 +101,7 @@ class Trainer:
             test_indices = all_indices[train_size + val_size :]
             self.test_set = SynDataset(
                 img_dir=self.config.data_root,
-                body_meta_dir=self.config.meta_file,
+                body_meta=meta,
                 indices=test_indices,
                 mode="test",
                 device=self.config.device,
