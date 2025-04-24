@@ -50,7 +50,10 @@ class Trainer:
         self._init_optimizer()
         self._init_scheduler()
         self._init_smplh_layer()
-        self.criterion = DNNMultiTaskLoss(config, self.smplh_layer)
+        self.criterion = DNNMultiTaskLoss(config, self.smplh_layer).to(self.device)
+
+        if self.config.checkpoint is not None:
+            self._load_checkpoint(self.config.checkpoint)
 
     def _init_smplh_layer(self):
         """Initialize SMPLH layer for calculating loss"""
@@ -64,12 +67,6 @@ class Trainer:
 
     def _init_datasets(self):
         """Initialize datasets with splits"""
-        full_dataset = SynDataset(
-            img_dir=self.config.data_root,
-            body_meta_dir=self.config.meta_file,
-            mode="train",
-            device=self.config.device,
-        )
         full_length = 95575
 
         # Create dataset splits
@@ -78,7 +75,7 @@ class Trainer:
         train_size = full_length - val_size - test_size
 
         all_indices = torch.randperm(
-            full_length, generator=torch.Generator().manual_seed(config.seed)
+            full_length, generator=torch.Generator().manual_seed(self.config.seed)
         )
         train_indices = all_indices[:train_size]
         val_indices = all_indices[train_size : train_size + val_size]
@@ -138,7 +135,9 @@ class Trainer:
         """Initialize model and move to device"""
         self.model = MultiTaskDNN(
             backbone_name=self.config.backbone_name,
-            pretrained=self.config.pretrained,
+            pretrained=(
+                self.config.pretrained if self.config.checkpoint is None else False
+            ),
             num_landmarks=self.config.num_landmarks,
             num_pose_params=self.config.num_pose_params,
             num_shape_params=self.config.num_shape_params,
@@ -173,6 +172,11 @@ class Trainer:
             self.scheduler = None
         else:
             raise ValueError(f"Unknown scheduler type: {self.config.scheduler_type}")
+
+    def _load_checkpoint(self, path):
+        checkpoint = torch.load(path, map_location=self.device)
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
     def _compute_loss(self, outputs, targets):
         """Compute multi-task loss"""
@@ -267,7 +271,7 @@ class Trainer:
                     )
 
                 self.val_history["total"].append(val_loss["total"])
-                self.val_history["landmark"].append(val_loss)
+                self.val_history["landmark"].append(val_loss["landmark"])
                 self.val_history["pose"].append(val_loss["pose"])
                 self.val_history["shape"].append(val_loss["shape"])
                 self.val_history["translation"].append(val_loss["translation"])
@@ -327,7 +331,7 @@ class Trainer:
                     }
                 )
 
-            if val_loss["total"] < best_loss or epoch % 50 == 0:
+            if val_loss["total"] < best_loss or epoch % 100 == 0:
                 if val_loss["total"] < best_loss:
                     model_name = "best_model"
                 else:
@@ -339,6 +343,7 @@ class Trainer:
                         "epoch": epoch,
                         "model_state_dict": self.model.state_dict(),
                         "optimizer_state_dict": self.optimizer.state_dict(),
+                        "scheduler_state_dict": self.scheduler.state_dict(),
                         "loss": loss,
                     },
                     os.path.join(
