@@ -13,7 +13,8 @@ from utils.config import ConfigManager
 from utils.losses import DNNMultiTaskLoss
 from tqdm import tqdm
 import yaml
-
+import gzip
+import pickle
 import wandb
 from pytorch_lightning.loggers import WandbLogger
 from datetime import datetime
@@ -80,7 +81,8 @@ class Trainer:
         train_indices = all_indices[:train_size]
         val_indices = all_indices[train_size : train_size + val_size]
 
-        meta = torch.load(self.config.meta_file, map_location="cpu")
+        with gzip.open(self.config.meta_file, "rb") as f:
+            meta = pickle.load(f)
 
         # Create datasets
         train_set = SynDataset(
@@ -114,6 +116,7 @@ class Trainer:
             shuffle=True,
             num_workers=self.config.num_workers,
             drop_last=True,
+            pin_memory=True,
         )
         self.val_loader = DataLoader(
             val_set,
@@ -207,7 +210,10 @@ class Trainer:
         for batch_idx, (images, targets, _) in enumerate(
             tqdm(self.train_loader, desc=f"Epoch {epoch} Training", leave=False)
         ):
-            images = images.to(self.device)
+            images = images.to(self.device, non_blocking=True)
+            targets = {
+                k: v.to(self.device, non_blocking=True) for k, v in targets.items()
+            }
 
             outputs = self.model(images)
             loss_dict = self._compute_loss(outputs, targets)
@@ -300,7 +306,10 @@ class Trainer:
             for images, targets, _ in tqdm(
                 self.val_loader, desc="Validating", leave=False
             ):
-                images = images.to(self.device)
+                images = images.to(self.device, non_blocking=True)
+                targets = {
+                    k: v.to(self.device, non_blocking=True) for k, v in targets.items()
+                }
                 outputs = self.model(images)
                 loss_dict = self._compute_loss(outputs, targets)
 
@@ -365,7 +374,11 @@ class Trainer:
 
         with torch.no_grad():
             for images, targets, _ in tqdm(self.test_loader, desc="Testing"):
-                images = images.to(self.device)
+                images = images.to(self.device, non_blocking=True)
+                targets = {
+                    k: v.to(self.device, non_blocking=True) for k, v in targets.items()
+                }
+
                 outputs = self.model(images)
                 loss_dict = self._compute_loss(outputs, targets)
 

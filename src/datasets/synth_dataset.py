@@ -1,5 +1,7 @@
 import os
 import torch
+import gzip
+import pickle
 from pathlib import Path
 import kornia.augmentation as K
 from torchvision.io import decode_image
@@ -27,7 +29,8 @@ class SynDataset(Dataset):
         ).to(device)
 
         if isinstance(body_meta, str):
-            body_meta = torch.load(body_meta, map_location="cpu")
+            with gzip.open(body_meta, "rb") as f:
+                body_meta = pickle.load(f)
 
         all_uids = list(body_meta.keys())
 
@@ -45,16 +48,16 @@ class SynDataset(Dataset):
         uid = self.uids[idx]
         img_path = os.path.join(self.img_dir, f"img_{uid}.jpg")
 
-        img = (decode_image(img_path).float() / 255.0).unsqueeze(0)
-        kp2d = self.body_meta[uid]["ldmks_2d"].unsqueeze(0)
-        roi = self.body_meta[uid]["roi"].unsqueeze(0)
+        img = decode_image(img_path).float() / 255.0
+        kp2d = self.body_meta[uid]["ldmks_2d"]
+        roi = self.body_meta[uid]["roi"]
         pose = self.body_meta[uid]["pose"]  # Local axis angle representation!!
         shape = self.body_meta[uid]["shape"][:10]  # only first 10 elements
 
         # Move to device for augmentation
-        img = img.to(self.device)
-        kp2d = kp2d.to(self.device)
-        roi = roi.to(self.device)
+        img = img.to(self.device).unsqueeze(0)
+        kp2d = torch.from_numpy(kp2d).to(self.device, dtype=torch.float32).unsqueeze(0)
+        roi = torch.from_numpy(roi).to(self.device, dtype=torch.float32).unsqueeze(0)
 
         if self.train and self.appearance_aug is not None:
             img, kp2d = random_roi_transform(img, kp2d, roi, "train")
@@ -66,21 +69,21 @@ class SynDataset(Dataset):
         img = self.normalize(img)
 
         # Normalize 2D landmark coordinates to [0, 1]
-        kp2d = kp2d/img.shape[-1]
+        kp2d = kp2d / img.shape[-1]
 
         target = {
-            "landmarks": kp2d.squeeze(0),
-            "pose": pose.to(self.device),
-            "shape": shape.to(self.device),
+            "landmarks": kp2d.squeeze(0).cpu(),
+            "pose": torch.from_numpy(pose).float(),
+            "shape": torch.from_numpy(shape).float(),
         }
 
-        return img.squeeze(0), target, uid
+        return img.squeeze(0).cpu(), target, uid
 
 # Test dataset and augmentation
 if __name__ == "__main__":
     dataset = SynDataset(
         img_dir=Path("data/raw/synth_body"),
-        body_meta="data/annotations/body_meta.pt",
+        body_meta="data/annotations/body_meta.pkl.gz",
         mode="train",
         device="cuda" if torch.cuda.is_available() else "cpu",
     )
