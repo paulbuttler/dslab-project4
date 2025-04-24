@@ -122,8 +122,9 @@ class Trainer:
             val_set,
             batch_size=self.config.val_batch_size,
             shuffle=False,
-            num_workers=0,
+            num_workers=self.config.num_workers // 2,
             drop_last=False,
+            pin_memory=True,
         )
         if test_size > 0:
             self.test_loader = DataLoader(
@@ -181,7 +182,10 @@ class Trainer:
     def _load_checkpoint(self, path):
         checkpoint = torch.load(path, map_location=self.device)
         self.model.load_state_dict(checkpoint["model_state_dict"])
-        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+        # self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        # for param_group in self.optimizer.param_groups:
+        #     param_group["lr"] = self.config.lr  # reset learning rate
 
     def _compute_loss(self, outputs, targets):
         """Compute multi-task loss"""
