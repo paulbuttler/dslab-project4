@@ -165,14 +165,20 @@ def local_to_global(poses, part:str, output_format="aa", input_format="aa"):
     local_oris = local_oris.reshape((-1, n_joints, 3, 3))
     global_oris = torch.zeros_like(local_oris)
 
+    # Initialize global_oris as a list to avoid in-place modifications
+    global_oris = [None] * n_joints
+
     for j in range(n_joints):
         if parents[j][1] < 0:
-            # root rotation
-            global_oris[..., j, :, :] = local_oris[..., j, :, :]
+            # Root rotation
+            global_oris[j] = local_oris[..., j, :, :]
         else:
-            parent_rot = global_oris[..., parents[j][1], :, :]
+            parent_rot = global_oris[parents[j][1]]
             local_rot = local_oris[..., j, :, :]
-            global_oris[..., j, :, :] = torch.matmul(parent_rot, local_rot)
+            global_oris[j] = torch.matmul(parent_rot, local_rot)
+
+    # Stack the list into a single tensor
+    global_oris = torch.stack(global_oris, dim=-3)
 
     if output_format == "aa":
         global_oris = rot2aa(global_oris.reshape((-1, 3, 3)))
@@ -180,3 +186,70 @@ def local_to_global(poses, part:str, output_format="aa", input_format="aa"):
     else:
         res = global_oris.reshape((-1, n_joints * 3 * 3))
     return res
+
+
+def global_to_local(
+    global_rots: torch.Tensor, part: str = "body", output_format: str = "aa"
+):
+    """
+    Convert global rotation matrices to local (parent-relative) rotations.
+    Args:
+        global_rots: (B, n_joints, 3, 3)
+        part: 'body', 'hand', or 'face'
+        output_format: 'rotmat' or 'aa'
+    Returns:
+        Local rotations in the requested format.
+    """
+    assert output_format in ("aa", "rotmat")
+    assert part in ("body", "hand", "face")
+
+    B, n_joints = global_rots.shape[:2]
+
+    plist = JOINT_PARENTS[part][:n_joints]
+    child_ids = [c for c, _ in plist]
+    parent_of = {c: p for c, p in plist}
+    idx_of_child = {c: i for i, c in enumerate(child_ids)}
+
+    local_rots = torch.empty_like(global_rots)
+
+    for idx, child_id in enumerate(child_ids):
+        parent_id = parent_of[child_id]
+        if parent_id == -1:
+            local_rots[:, idx] = global_rots[:, idx]
+        else:
+            p_idx = idx_of_child[parent_id]
+            local_rots[:, idx] = (
+                global_rots[:, p_idx].transpose(-1, -2) @ global_rots[:, idx]
+            )
+
+    if output_format == "rotmat":
+        return local_rots
+    return rot2aa(local_rots.reshape(-1, 3, 3)).reshape(B, n_joints, 3)
+
+
+if __name__ == "__main__":
+    # Test the round-trip conversion between local and global representations
+    batch_size = 4
+    n_joints = 52
+    local_aa = torch.randn(batch_size, n_joints, 3) * 0.3
+
+    local_flat = local_aa.reshape(batch_size, n_joints * 3)  # (B, J*3)
+
+    global_rotmats = local_to_global(
+        local_flat,
+        part="body",
+        output_format="rotmat",
+        input_format="aa",
+    ).reshape(batch_size, n_joints, 3, 3)
+
+    recovered_local_aa = global_to_local(
+        global_rotmats, part="body", output_format="aa"
+    )  # (B, J, 3)
+
+    R_orig = aa2rot(local_aa.reshape(-1, 3)).reshape(batch_size, n_joints, 3, 3)
+    R_recovered = aa2rot(recovered_local_aa.reshape(-1, 3)).reshape_as(R_orig)
+
+    assert torch.allclose(
+        R_orig, R_recovered, atol=1e-6
+    ), f"max rot-mat diff { (R_orig-R_recovered).abs().max().item()}"
+    print("✅ round-trip passed, max diff ≲ 1e-6")
