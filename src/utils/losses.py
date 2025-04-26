@@ -1,13 +1,18 @@
 import torch
 import torch.nn as nn
-from utils.rottrans import rotation_6d_to_matrix, matrix_to_rotation_6d, local_to_global
+from utils.rottrans import (
+    rotation_6d_to_matrix,
+    matrix_to_rotation_6d,
+    local_to_global,
+    aa2rot,
+)
 
 class RotationLoss(nn.Module):
-    """rotation loss in rad computed from rotation matrix"""
+    """Rotation loss in rad computed from world space rotation matrices"""
     def __init__(self, reduction='mean'):
         super().__init__()
         self.reduction = reduction
-        
+
     def forward(self, R_hat, R_gt):
         """
         Args:
@@ -16,12 +21,12 @@ class RotationLoss(nn.Module):
         """
         # relative rot mat
         R_rel = torch.matmul(R_hat, R_gt.transpose(-1, -2))
-        
+
         # angle diff in rad
         trace = R_rel.diagonal(dim1=-2, dim2=-1).sum(-1)
         clipped_trace = torch.clamp((trace - 1.0) / 2.0, -1.0 + 1e-6, 1.0 - 1e-6)
         angle_diffs = torch.acos(clipped_trace)
-        
+
         if self.reduction == 'mean':
             return angle_diffs.mean()
         elif self.reduction == 'sum':
@@ -29,11 +34,11 @@ class RotationLoss(nn.Module):
         return angle_diffs
 
 class JointPositionLoss(nn.Module):
-    """l1 loss of joint loc diff"""
+    """L1 loss of joint loc diff"""
     def __init__(self, reduction='mean'):
         super().__init__()
         self.reduction = reduction
-        
+
     def forward(self, pred_joints, gt_joints):
         """
         Args:
@@ -41,7 +46,7 @@ class JointPositionLoss(nn.Module):
             gt_joints: (B, J, 3) ground truth joint loc
         """
         l1_loss = torch.abs(pred_joints - gt_joints).sum(dim=-1)
-        
+
         if self.reduction == 'mean':
             return l1_loss.mean()
         elif self.reduction == 'sum':
@@ -104,35 +109,49 @@ class DNNMultiTaskLoss(nn.Module):
         # shape loss
         shape_loss = self.shape_loss(outputs["shape"], targets["shape"])
 
-        # Convert local axis-angle representation of pose to global rotation matrices
-        gt_pose_rotmat = local_to_global(
-            targets["pose"], part="body", output_format="rotmat", input_format="aa"
-        ).view(-1, 52, 3, 3)
-        gt_pelvis_rotmat = gt_pose_rotmat[
-            :, 0, ...
-        ]  # (B, 3, 3) global orientation (pelvis)
-        gt_pose_rotmat = gt_pose_rotmat[:, 1:22, ...]  # (B, 21, 3, 3) body pose only
+        gt_pose_aa = targets["pose"]  # (B, 52, 3)
+        gt_pose_rotmat = aa2rot(gt_pose_aa)  # (B, 52, 3, 3)
+        gt_global_rot = local_to_global(
+            gt_pose_aa, part="body", output_format="rotmat", input_format="aa"
+        ).reshape(
+            -1, 52, 3, 3
+        )  # (B, 52, 3, 3)
 
-        # convert predicted pose 6d rotations to global rotation matrices
-        pred_pose_rotmat = rotation_6d_to_matrix(outputs["pose"])  # (B, 21, 3, 3)
+        pelvis = gt_pose_rotmat[:, 0, ...]  # (B, 3, 3) global orientation (pelvis)
+
+        pred_pose_6d = outputs["pose"]  # (B, 21, 6)
+        pred_pose_rotmat = rotation_6d_to_matrix(pred_pose_6d)  # (B, 21, 3, 3)
+        cat_pose = torch.cat(
+            [pelvis.unsqueeze(1), pred_pose_rotmat], dim=1
+        )  # (B, 22, 3, 3)
+        pred_global_rot = local_to_global(
+            cat_pose.reshape(-1, 22 * 9),
+            part="body",
+            output_format="rotmat",
+            input_format="rotmat",
+        ).reshape(
+            -1, 22, 3, 3
+        )  # (B, 22, 3, 3)
 
         # pose loss 6d rotations
-        gt_pose_6d = matrix_to_rotation_6d(gt_pose_rotmat)  # (B, 21, 6)
-        pose_loss = self.pose_loss(outputs["pose"], gt_pose_6d)
+        gt_pose_6d = matrix_to_rotation_6d(gt_pose_rotmat[:, 1:22, ...])  # (B, 21, 6)
+        pose_loss = self.pose_loss(pred_pose_6d, gt_pose_6d)
 
         # Joint rotation loss
-        rot_loss = self.rot_loss(pred_pose_rotmat, gt_pose_rotmat)
+        rot_loss = self.rot_loss(
+            pred_global_rot[:, 1:22, ...], gt_global_rot[:, 1:22, ...]
+        )
 
         # Joint translation loss
         gt_joints = self._get_predicted_joints(
             shape=targets["shape"],
-            global_orient=gt_pelvis_rotmat.detach(),
-            pose=gt_pose_rotmat,
+            global_orient=pelvis.detach(),
+            pose=gt_pose_rotmat[:, 1:22, ...],
             require_grad=False,
         )[:, 1:22, ...]
         pred_joints = self._get_predicted_joints(
             shape=outputs["shape"],
-            global_orient=gt_pelvis_rotmat.detach(),
+            global_orient=pelvis.detach(),
             pose=pred_pose_rotmat,
             require_grad=True,
         )[:, 1:22, ...]

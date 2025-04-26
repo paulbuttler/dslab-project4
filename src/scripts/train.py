@@ -53,7 +53,7 @@ class Trainer:
         self._init_smplh_layer()
         self.criterion = DNNMultiTaskLoss(config, self.smplh_layer).to(self.device)
 
-        if self.config.checkpoint is not None:
+        if self.config.checkpoint != "None":
             self._load_checkpoint(self.config.checkpoint)
 
     def _init_smplh_layer(self):
@@ -182,8 +182,7 @@ class Trainer:
     def _load_checkpoint(self, path):
         checkpoint = torch.load(path, map_location=self.device)
         self.model.load_state_dict(checkpoint["model_state_dict"])
-
-        # self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         # for param_group in self.optimizer.param_groups:
         #     param_group["lr"] = self.config.lr  # reset learning rate
 
