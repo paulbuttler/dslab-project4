@@ -345,9 +345,10 @@ class Trainer:
                     }
                 )
 
-            if val_loss["total"] < best_loss or epoch % 100 == 0:
+            if val_loss["total"] < best_loss or epoch % 50 == 0:
                 if val_loss["total"] < best_loss:
                     model_name = "best_model"
+                    best_loss = val_loss["total"]
                 else:
                     model_name = f"model_epoch_{epoch}"
 

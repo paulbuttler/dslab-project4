@@ -31,13 +31,19 @@ class MultiTaskDNN(nn.Module):
             backbone_name,
             pretrained=pretrained,
             features_only=False,
-            num_classes=0,  # No classification head
-            # The four HRnet feature maps are conbined into a tensor of shape [B, 2048]
+            num_classes=backbone_feat_dim,
         )
+        # self.backbone = timm.create_model(
+        #     backbone_name,
+        #     pretrained=pretrained,
+        #     features_only=False,
+        #     num_classes=0,  # No classification head
+        #     # The four HRnet feature maps are conbined into a tensor of shape [B, 2048]
+        # )
 
-        self.compress = nn.Sequential(
-            nn.Linear(2048, backbone_feat_dim), nn.LeakyReLU()
-        )
+        # self.compress = nn.Sequential(
+        #     nn.Linear(2048, backbone_feat_dim), nn.LeakyReLU()
+        # )
 
         # MLP heads
         self.landmark_head = self._build_head(
@@ -59,14 +65,14 @@ class MultiTaskDNN(nn.Module):
 
     def forward(self, x):
         features = self.backbone(x)
-        features = self.compress(features)
+        # features = self.compress(features)
         B = features.shape[0]
 
         # Multi-task regression using compressed features
         return {
-            "landmarks": self.landmark_head(features).view((B, -1, 3)),
-            "pose": self.pose_head(features).view((B, -1, 6)),
-            "shape": self.shape_head(features).view((B, -1)),
+            "landmarks": self.landmark_head(features).reshape((B, -1, 3)),
+            "pose": self.pose_head(features).reshape((B, -1, 6)),
+            "shape": self.shape_head(features).reshape((B, -1)),
         }
 
 ## FOR TEST ONLY!
@@ -79,9 +85,9 @@ if __name__ == "__main__":
         print(
             f"backbone feature dimensions: {backbone_features.shape}"
         )  # should be [2, 2048]
-        print(
-            f"compressed feature dim: {model.compress(backbone_features).shape}"
-        )  # should be [2, 512]
+        # print(
+        #     f"compressed feature dim: {model.compress(backbone_features).shape}"
+        # )  # should be [2, 512]
         outputs = model(dummy_input)
         print(
             f"landmark part, head output dim: {outputs['landmarks'].shape}"

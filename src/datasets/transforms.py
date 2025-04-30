@@ -1,4 +1,3 @@
-import random
 import torch
 import torch.nn as nn
 import kornia.filters as KF
@@ -44,14 +43,14 @@ def random_roi_transform(
     B = img.shape[0]
 
     # Use a triangular distribution for simple sampling around the ideal ROI
-    angle = sample_triangular(-20.0, 25.0, 0.0, (B,), device=device)
+    angle = sample_triangular(-25.0, 25.0, 0.0, (B,), device=device)
 
-    scale_offset = sample_triangular(-0.04, 0.10, 0.0, (B,), device=device)
+    scale_offset = sample_triangular(-0.08, 0.12, 0.0, (B,), device=device)
     scale = (1.0 + scale_offset).unsqueeze(1).expand(-1, 2)
 
     roi_w = roi[:, 2] - roi[:, 0]
-    tx = sample_triangular(-0.05, 0.05, 0.0, (B,), device=device) * roi_w
-    ty = sample_triangular(-0.05, 0.05, 0.0, (B,), device=device) * roi_w
+    tx = sample_triangular(-0.06, 0.06, 0.0, (B,), device=device) * roi_w
+    ty = sample_triangular(-0.06, 0.06, 0.0, (B,), device=device) * roi_w
     translation = torch.stack([tx, ty], dim=1)
 
     return apply_roi_transform(
@@ -119,11 +118,11 @@ class AppearanceAugmentation(nn.Module):
     def __init__(self):
         super().__init__()
         self.probs = {
-            "motion_blur": 0.1,
+            "motion_blur": 0.2,
             "brightness": 0.4,
             "contrast": 0.4,
             "hue_saturation": 0.3,
-            "grayscale": 0.05,
+            "grayscale": 0.1,
             "jpeg": 0.2,
             "iso_noise": 0.2,
         }
@@ -132,29 +131,29 @@ class AppearanceAugmentation(nn.Module):
             hue=0.05, saturation=0.15, p=self.probs["hue_saturation"]
         )
         self.grayscale = K.RandomGrayscale(p=self.probs["grayscale"])
-        self.jpeg = K.RandomJPEG(jpeg_quality=(60, 95), p=self.probs["jpeg"])
+        self.jpeg = K.RandomJPEG(jpeg_quality=(50, 95), p=self.probs["jpeg"])
 
     def forward(self, img: torch.Tensor):
 
         device = img.device
 
-        # Motion blur with kernel size (proportional to image size??)
-        if random.random() < self.probs["motion_blur"]:
-            kernel_size = random.choice([3, 5])
-            angle = random.uniform(0, 360)
-            direction = random.uniform(-1.0, 1.0)
+        # Motion blur with kernel size propotional to image size
+        if torch.rand(1, device=device) < self.probs["motion_blur"]:
+            kernel_size = max(3, min(12, int(img.shape[-1] * 0.02) | 1))  # Force odd
+            angle = torch.rand(1, device=device) * 360
+            direction = torch.rand(1, device=device) * 2 - 1
             img = KF.motion_blur(
                 img, kernel_size=kernel_size, angle=angle, direction=direction
             )
 
         # Brightness (constant shift)
-        if random.random() < self.probs["brightness"]:
-            offset = random.uniform(-0.1, 0.1)
+        if torch.rand(1, device=device) < self.probs["brightness"]:
+            offset = torch.rand(1, device=device) * 0.3 - 0.15
             img = (img + offset).clamp(0, 1)
 
         # Contrast adjustment
-        if random.random() < self.probs["contrast"]:
-            contrast = random.uniform(-0.2, 0.2)
+        if torch.rand(1, device=device) < self.probs["contrast"]:
+            contrast = torch.rand(1, device=device) * 0.5 - 0.25
             img = ((img - 0.5) * (1 + contrast) + 0.5).clamp(0, 1)
 
         # Hue and saturation, grayscale and JPEG compression
@@ -164,7 +163,7 @@ class AppearanceAugmentation(nn.Module):
         img = self.jpeg(img.to("cpu")).to(device)
 
         # ISO noise
-        if random.random() < self.probs["iso_noise"]:
+        if torch.rand(1, device=device) < self.probs["iso_noise"]:
             img = (
                 torch.poisson(img * 512) / 512 + torch.randn_like(img) * 0.002
             ).clamp(0, 1)
