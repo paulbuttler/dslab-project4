@@ -14,7 +14,7 @@ class SynDataset(Dataset):
     def __init__(
         self,
         img_dir: str,
-        body_meta,  # can be a path or a dict
+        metadata,  # can be a path or a dict
         indices=None,
         mode="train",
         device="cuda",
@@ -28,17 +28,17 @@ class SynDataset(Dataset):
             std=torch.tensor([0.229, 0.224, 0.225])
         ).to(device)
 
-        if isinstance(body_meta, str):
-            with gzip.open(body_meta, "rb") as f:
-                body_meta = pickle.load(f)
+        if isinstance(metadata, str):
+            with gzip.open(metadata, "rb") as f:
+                metadata = pickle.load(f)
 
-        all_uids = list(body_meta.keys())
+        all_uids = list(metadata.keys())
 
         self.uids = [all_uids[i] for i in indices] if indices is not None else all_uids
-        self.body_meta = (
-            {uid: body_meta[uid] for uid in self.uids}
+        self.metadata = (
+            {uid: metadata[uid] for uid in self.uids}
             if indices is not None
-            else body_meta
+            else metadata
         )
 
     def __len__(self):
@@ -49,10 +49,10 @@ class SynDataset(Dataset):
         img_path = os.path.join(self.img_dir, f"img_{uid}.jpg")
 
         img = decode_image(img_path).float() / 255.0
-        kp2d = self.body_meta[uid]["ldmks_2d"]
-        roi = self.body_meta[uid]["roi"]
-        pose = self.body_meta[uid]["pose"]  # Local axis angle representation!!
-        shape = self.body_meta[uid]["shape"][:10]  # only first 10 elements
+        kp2d = self.metadata[uid]["ldmks_2d"]
+        roi = self.metadata[uid]["roi"]
+        pose = self.metadata[uid]["pose"]  # Local axis angle representation!!
+        shape = self.metadata[uid]["shape"][:10]  # only first 10 elements
 
         # Move to device for augmentation
         img = img.to(self.device).unsqueeze(0)
@@ -83,7 +83,7 @@ class SynDataset(Dataset):
 if __name__ == "__main__":
     dataset = SynDataset(
         img_dir=Path("data/raw/synth_body"),
-        body_meta="data/annotations/body_meta.pkl.gz",
+        metadata="data/annotations/body_meta.pkl.gz",
         mode="train",
         device="cuda" if torch.cuda.is_available() else "cpu",
     )

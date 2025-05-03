@@ -45,7 +45,7 @@ def random_roi_transform(
     # Use a triangular distribution for simple sampling around the ideal ROI
     angle = sample_triangular(-25.0, 25.0, 0.0, (B,), device=device)
 
-    scale_offset = sample_triangular(-0.08, 0.12, 0.0, (B,), device=device)
+    scale_offset = sample_triangular(-0.05, 0.10, 0.0, (B,), device=device)
     scale = (1.0 + scale_offset).unsqueeze(1).expand(-1, 2)
 
     roi_w = roi[:, 2] - roi[:, 0]

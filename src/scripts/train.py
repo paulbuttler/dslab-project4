@@ -53,9 +53,6 @@ class Trainer:
         self._init_smplh_layer()
         self.criterion = DNNMultiTaskLoss(config, self.smplh_layer).to(self.device)
 
-        if self.config.checkpoint != "None":
-            self._load_checkpoint(self.config.checkpoint)
-
     def _init_smplh_layer(self):
         """Initialize SMPLH layer for calculating loss"""
         self.smplh_layer = SMPLHLayer(
@@ -87,14 +84,14 @@ class Trainer:
         # Create datasets
         train_set = SynDataset(
             img_dir=self.config.data_root,
-            body_meta=meta,
+            metadata=meta,
             indices=train_indices,
             mode="train",
             device=self.config.device,
         )
         val_set = SynDataset(
             img_dir=self.config.data_root,
-            body_meta=meta,
+            metadata=meta,
             indices=val_indices,
             mode="test",
             device=self.config.device,
@@ -103,7 +100,7 @@ class Trainer:
             test_indices = all_indices[train_size + val_size :]
             self.test_set = SynDataset(
                 img_dir=self.config.data_root,
-                body_meta=meta,
+                metadata=meta,
                 indices=test_indices,
                 mode="test",
                 device=self.config.device,
@@ -142,7 +139,7 @@ class Trainer:
         self.model = MultiTaskDNN(
             backbone_name=self.config.backbone_name,
             pretrained=(
-                self.config.pretrained if self.config.checkpoint is None else False
+                self.config.pretrained if self.config.checkpoint == "None" else False
             ),
             num_landmarks=self.config.num_landmarks,
             num_pose_params=self.config.num_pose_params,
@@ -181,10 +178,12 @@ class Trainer:
 
     def _load_checkpoint(self, path):
         checkpoint = torch.load(path, map_location=self.device)
+        self.start_epoch = checkpoint["epoch"] + 1
+        self.best_loss = checkpoint["loss"]
         self.model.load_state_dict(checkpoint["model_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        # for param_group in self.optimizer.param_groups:
-        #     param_group["lr"] = self.config.lr  # reset learning rate
+        if self.scheduler is not None:
+            self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
 
     def _compute_loss(self, outputs, targets):
         """Compute multi-task loss"""
@@ -326,9 +325,13 @@ class Trainer:
 
     def train(self):
         """Full training loop"""
-        best_loss = float('inf')
+        if self.config.checkpoint != "None":
+            self._load_checkpoint(self.config.checkpoint)
+        else:
+            self.start_epoch = 1
+            self.best_loss = float("inf")
 
-        for epoch in range(1, self.config.epochs+1):
+        for epoch in range(self.start_epoch, self.config.epochs + 1):
             print(f"\nEpoch {epoch}/{self.config.epochs}")
 
             # Train & validate
@@ -345,10 +348,10 @@ class Trainer:
                     }
                 )
 
-            if val_loss["total"] < best_loss or epoch % 50 == 0:
-                if val_loss["total"] < best_loss:
+            if val_loss["total"] < self.best_loss or epoch % 50 == 0:
+                if val_loss["total"] < self.best_loss:
                     model_name = "best_model"
-                    best_loss = val_loss["total"]
+                    self.best_loss = val_loss["total"]
                 else:
                     model_name = f"model_epoch_{epoch}"
 
@@ -356,10 +359,14 @@ class Trainer:
                 torch.save(
                     {
                         "epoch": epoch,
+                        "loss": loss,
                         "model_state_dict": self.model.state_dict(),
                         "optimizer_state_dict": self.optimizer.state_dict(),
-                        "scheduler_state_dict": self.scheduler.state_dict(),
-                        "loss": loss,
+                        "scheduler_state_dict": (
+                            self.scheduler.state_dict()
+                            if self.scheduler is not None
+                            else None
+                        ),
                     },
                     os.path.join(
                         self.config.save_dir, f"{model_name}_{self.run_name}.pth"

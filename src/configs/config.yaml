@@ -1,5 +1,5 @@
 # wandb settings
-name: Run_1
+name: Run_2_cont
 entity: dsl_project4
 project: body_dnn
 
@@ -7,19 +7,19 @@ project: body_dnn
 device: auto
 seed: 42
 epochs: 600 # In full experiment, adjust to 600
-batch_size: 50 # In full experiment, adjust to 64 # 80000 train samples, so 1250 iterations per epoch
+batch_size: 50 
 accumulation_steps: 5 # simulates larger batch_size
-val_batch_size: 50 # for val and test
+val_batch_size: 100 # for val and test
 lr: 0.0001
-weight_decay: 0.0001 # In full experiment, use 0.01
+weight_decay: 0.0001 
 scheduler_type: cosine # In full experiment, use cosine
-min_lr: 0.000001 # In full experiment, use 0.000001
-step_per_period: 20 # param for cosine annealing warm restarts scheduler
+min_lr: 0.000001 
+step_per_period: 20 # for cosine warm restart scheduler
 
 # Model parameters
-backbone_name: hrnet_w48.ms_in1k # In full experiment, use hrnet_w18.ms_aug_in1k; for light-weight test, use hrnet_w18_small.ms_in1k
+backbone_name: hrnet_w48.ms_in1k
 pretrained: True
-checkpoint: None
+checkpoint: /cluster/home/pbuttler/dslab-project4/checkpoints/best_model_0501-1011_Run_2_26b02.pth
 smplh_model_path: ./models/smplx/params/smplh
 backbone_feat_dim: 512
 mlp_head_hidden_dim: 512
@@ -30,7 +30,6 @@ num_pose_params: 21
 num_shape_params: 10
 
 # Loss weights
-#### ATTENTION: ALL HYPERPARAMS OF THIS PART REQUIRES FURTHER FINE_TUNING!!!!!!
 landmark_weight: 10.0
 pose_weight: 1.0
 trans_weight: 2.0
