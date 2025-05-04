@@ -6,3 +6,4 @@ experiments/body/
 tools/visualize/smplh/
 src/models/smplx/params/
 imgui.ini
+*.pth
