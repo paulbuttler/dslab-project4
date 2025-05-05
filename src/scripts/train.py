@@ -1,6 +1,6 @@
 import os
 import torch
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import (
     CosineAnnealingWarmRestarts,
@@ -13,13 +13,11 @@ from utils.config import ConfigManager
 from utils.losses import DNNMultiTaskLoss
 from tqdm import tqdm
 import yaml
-import gzip
-import pickle
+import joblib
 import wandb
 from pytorch_lightning.loggers import WandbLogger
 from datetime import datetime
 import uuid
-
 import multiprocessing as mp
 
 mp.set_start_method("spawn", force=True)
@@ -79,8 +77,7 @@ class Trainer:
         train_indices = all_indices[:train_size]
         val_indices = all_indices[train_size : train_size + val_size]
 
-        with gzip.open(self.config.meta_file, "rb") as f:
-            meta = pickle.load(f)
+        meta = joblib.load(self.config.meta_file)
 
         # Create datasets
         train_set = SynDataset(
