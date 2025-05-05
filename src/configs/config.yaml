@@ -1,17 +1,17 @@
 # wandb settings
-name: Run_2_cont
+name: Run_3
 entity: dsl_project4
 project: body_dnn
 
 # Training parameters
 device: auto
 seed: 42
-epochs: 600 # In full experiment, adjust to 600
+epochs: 400 # In full experiment, adjust to 600
 batch_size: 50 
 accumulation_steps: 5 # simulates larger batch_size
 val_batch_size: 100 # for val and test
 lr: 0.0001
-weight_decay: 0.0001 
+weight_decay: 0.01
 scheduler_type: cosine # In full experiment, use cosine
 min_lr: 0.000001 
 step_per_period: 20 # for cosine warm restart scheduler
@@ -19,7 +19,7 @@ step_per_period: 20 # for cosine warm restart scheduler
 # Model parameters
 backbone_name: hrnet_w48.ms_in1k
 pretrained: True
-checkpoint: /cluster/home/pbuttler/dslab-project4/checkpoints/best_model_0501-1011_Run_2_26b02.pth
+checkpoint: 
 smplh_model_path: ./models/smplx/params/smplh
 backbone_feat_dim: 512
 mlp_head_hidden_dim: 512
@@ -42,7 +42,7 @@ val_interval: 800
 
 # Data parameters
 data_root: /cluster/project/hilliges/dsl_4/body/synth_body ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
-meta_file: /cluster/project/hilliges/dsl_4/body/body_meta.pkl.gz ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
+meta_file: /cluster/project/hilliges/dsl_4/body/body_meta.pkl ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
 val_ratio: 0.1
 test_ratio: 0.0
 num_workers: 4

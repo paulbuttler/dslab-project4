@@ -53,13 +53,22 @@ def get_predictions(model, batch, device):
     images = denormalize(images).cpu()  # [B, 3, H, W]
 
     ldmks = targets["landmarks"] * h
-    global_orient = targets["pose"][:, 0]
-    body_pose = targets["pose"][:, 1:22]
-    left_hand_pose = targets["pose"][:, 22:37]
-    right_hand_pose = targets["pose"][:, 37:]
-    shape = targets["shape"]
+    translation = targets["translation"]
+    gt_shape = targets["shape"]
+    gt_pose = targets["pose"]
 
-    return images, uids, ldmks, global_orient, body_pose, left_hand_pose, right_hand_pose, shape, pred_ldmks, pred_std, pred_pose, pred_shape
+    return (
+        images,
+        uids,
+        translation,
+        ldmks,
+        gt_shape,
+        gt_pose,
+        pred_ldmks,
+        pred_std,
+        pred_shape,
+        pred_pose,
+    )
 
 def get_val_dataloader(config, data_root, meta_file, batch_size=16):
     """
@@ -96,24 +105,22 @@ def get_val_dataloader(config, data_root, meta_file, batch_size=16):
 if __name__ == "__main__":
     run_name = "0503-2012_Run_2_cont_74664"
     data_root = "./data/raw/synth_body"
-    meta_file = "./data/annotations/body_meta.pkl.gz"
+    meta_file = "./data/annotations/body_meta.pkl"
 
     model, config = load_model(run_name)
-    
+
     val_loader = get_val_dataloader(config, data_root, meta_file)
     batch = next(iter(val_loader))
 
     (
         images,
         uids,
+        translation,
         ldmks,
-        global_orient,
-        body_pose,
-        left_hand_pose,
-        right_hand_pose,
-        shape,
+        gt_shape,
+        gt_pose,
         pred_ldmks,
         pred_std,
-        pred_pose,
         pred_shape,
+        pred_pose,
     ) = get_predictions(model, batch, config.device)
