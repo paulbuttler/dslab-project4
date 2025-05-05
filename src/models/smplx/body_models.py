@@ -38,6 +38,11 @@ from .utils import (
     FLAMEOutput,
     find_joint_kin_chain)
 from .vertex_joint_selector import VertexJointSelector
+from collections import namedtuple
+
+TensorOutput = namedtuple('TensorOutput',
+                          ['vertices', 'joints', 'betas', 'expression', 'global_orient', 'body_pose', 'left_hand_pose',
+                           'right_hand_pose', 'jaw_pose', 'transl', 'full_pose'])
 
 
 class SMPL(nn.Module):
@@ -48,7 +53,7 @@ class SMPL(nn.Module):
 
     def __init__(
         self, model_path: str,
-	    kid_template_path: str = '',
+        kid_template_path: str = '',
         data_struct: Optional[Struct] = None,
         create_betas: bool = True,
         betas: Optional[Tensor] = None,
@@ -142,16 +147,20 @@ class SMPL(nn.Module):
         shapedirs = data_struct.shapedirs
         if (shapedirs.shape[-1] < self.SHAPE_SPACE_DIM):
             print(f'WARNING: You are using a {self.name()} model, with only'
-                  ' 10 shape coefficients.')
-            num_betas = min(num_betas, 10)
+                  f' {shapedirs.shape[-1]} shape coefficients.\n'
+                  f'num_betas={num_betas}, shapedirs.shape={shapedirs.shape}, '
+                  f'self.SHAPE_SPACE_DIM={self.SHAPE_SPACE_DIM}')
+            num_betas = min(num_betas, shapedirs.shape[-1])
         else:
             num_betas = min(num_betas, self.SHAPE_SPACE_DIM)
 
-        if self.age=='kid':
+        if self.age == 'kid':
             v_template_smil = np.load(kid_template_path)
             v_template_smil -= np.mean(v_template_smil, axis=0)
-            v_template_diff = np.expand_dims(v_template_smil - data_struct.v_template, axis=2)
-            shapedirs = np.concatenate((shapedirs[:, :, :num_betas], v_template_diff), axis=2)
+            v_template_diff = np.expand_dims(
+                v_template_smil - data_struct.v_template, axis=2)
+            shapedirs = np.concatenate(
+                (shapedirs[:, :, :num_betas], v_template_diff), axis=2)
             num_betas = num_betas + 1
 
         self._num_betas = num_betas
@@ -513,6 +522,7 @@ class SMPLH(SMPL):
         right_hand_pose: Optional[Tensor] = None,
         use_pca: bool = True,
         num_pca_comps: int = 6,
+        num_betas=16,
         flat_hand_mean: bool = False,
         batch_size: int = 1,
         gender: str = 'neutral',
@@ -591,6 +601,7 @@ class SMPLH(SMPL):
             model_path=model_path,
             kid_template_path=kid_template_path,
             data_struct=data_struct,
+            num_betas=num_betas,
             batch_size=batch_size, vertex_ids=vertex_ids, gender=gender, age=age,
             use_compressed=use_compressed, dtype=dtype, ext=ext, **kwargs)
 
@@ -860,7 +871,7 @@ class SMPLHLayer(SMPLH):
                                self.lbs_weights, pose2rot=False)
 
         # Add any extra joints that might be needed
-        # joints = self.vertex_joint_selector(vertices, joints) ### ! IS IT OK TO REMOVE THIS LINE??????
+        joints = self.vertex_joint_selector(vertices, joints)
         if self.joint_mapper is not None:
             joints = self.joint_mapper(joints)
 
@@ -898,7 +909,7 @@ class SMPLX(SMPLH):
 
     def __init__(
         self, model_path: str,
-	kid_template_path: str = '',
+        kid_template_path: str = '',
         num_expression_coeffs: int = 10,
         create_expression: bool = True,
         expression: Optional[Tensor] = None,
@@ -966,7 +977,6 @@ class SMPLX(SMPLH):
             smplx_path = os.path.join(model_path, model_fn)
         else:
             smplx_path = model_path
-        print(os.path.abspath(smplx_path))
         assert osp.exists(smplx_path), 'Path {} does not exist!'.format(
             smplx_path)
 
@@ -1225,6 +1235,7 @@ class SMPLX(SMPLH):
         scale = int(batch_size / betas.shape[0])
         if scale > 1:
             betas = betas.expand(scale, -1)
+            expression = expression.expand(scale, -1)
         shape_components = torch.cat([betas, expression], dim=-1)
 
         shapedirs = torch.cat([self.shapedirs, self.expr_dirs], dim=-1)
@@ -1274,17 +1285,20 @@ class SMPLX(SMPLH):
         v_shaped = None
         if return_shaped:
             v_shaped = self.v_template + blend_shapes(betas, self.shapedirs)
+        else:
+            v_shaped = Tensor(0)
         output = SMPLXOutput(vertices=vertices if return_verts else None,
-                             joints=joints,
-                             betas=betas,
-                             expression=expression,
-                             global_orient=global_orient,
-                             body_pose=body_pose,
-                             left_hand_pose=left_hand_pose,
-                             right_hand_pose=right_hand_pose,
-                             jaw_pose=jaw_pose,
-                             v_shaped=v_shaped,
-                             full_pose=full_pose if return_full_pose else None)
+                              joints=joints,
+                              betas=betas,
+                              expression=expression,
+                              global_orient=global_orient,
+                              transl=transl,
+                              body_pose=body_pose,
+                              left_hand_pose=left_hand_pose,
+                              right_hand_pose=right_hand_pose,
+                              jaw_pose=jaw_pose,
+                              v_shaped=v_shaped,
+                              full_pose=full_pose if return_full_pose else None)
         return output
 
 
@@ -1322,9 +1336,9 @@ class SMPLXLayer(SMPLX):
         leye_pose: Optional[Tensor] = None,
         reye_pose: Optional[Tensor] = None,
         return_verts: bool = True,
-        return_full_pose: bool = False,
+        return_full_pose: bool = True,
         **kwargs
-    ) -> SMPLXOutput:
+    ) -> TensorOutput:
         '''
         Forward pass for the SMPLX model
 
@@ -1473,17 +1487,18 @@ class SMPLXLayer(SMPLX):
             joints += transl.unsqueeze(dim=1)
             vertices += transl.unsqueeze(dim=1)
 
-        output = SMPLXOutput(vertices=vertices if return_verts else None,
-                             joints=joints,
-                             betas=betas,
-                             expression=expression,
-                             global_orient=global_orient,
-                             body_pose=body_pose,
-                             left_hand_pose=left_hand_pose,
-                             right_hand_pose=right_hand_pose,
-                             jaw_pose=jaw_pose,
-                             transl=transl,
-                             full_pose=full_pose if return_full_pose else None)
+        output = TensorOutput(vertices=vertices if return_verts else Tensor(0),
+                              joints=joints,
+                              betas=betas,
+                              expression=expression,
+                              global_orient=global_orient,
+                              body_pose=body_pose,
+                              left_hand_pose=left_hand_pose,
+                              right_hand_pose=right_hand_pose,
+                              jaw_pose=jaw_pose,
+                              transl=transl if transl != None else Tensor(0),
+                              full_pose=full_pose if return_full_pose else Tensor(0))
+
         return output
 
 
@@ -2074,6 +2089,7 @@ class FLAME(SMPL):
         scale = int(batch_size / betas.shape[0])
         if scale > 1:
             betas = betas.expand(scale, -1)
+            expression = expression.expand(scale, -1)
         shape_components = torch.cat([betas, expression], dim=-1)
         shapedirs = torch.cat([self.shapedirs, self.expr_dirs], dim=-1)
 
