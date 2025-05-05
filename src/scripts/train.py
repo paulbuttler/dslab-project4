@@ -57,10 +57,11 @@ class Trainer:
         """Initialize SMPLH layer for calculating loss"""
         self.smplh_layer = SMPLHLayer(
             model_path=self.config.smplh_model_path,
-            gender='neutral',
+            gender="neutral",
             use_pca=False,
-            num_betas=10,
-            dtype=torch.float32
+            flat_hand_mean=True,
+            num_betas=16,
+            dtype=torch.float32,
         ).to(self.device)
 
     def _init_datasets(self):

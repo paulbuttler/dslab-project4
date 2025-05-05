@@ -98,7 +98,8 @@ class DNNMultiTaskLoss(nn.Module):
 
             targets: dict containing at least the following key-value pairs
                 - pose: (B, 52, 3) SMPLH pose params in local axis-angle representation
-                - shape: (B, 10) SMPLH shape params
+                - shape: (B, 16) SMPLH shape params
+                - translation: (B, 3) SMPLH translation
                 - landmarks: (B, L, 2) landmarks gt
         Return:
             loss: dict containing different terms of loss
@@ -107,54 +108,58 @@ class DNNMultiTaskLoss(nn.Module):
         landmark_loss = self.landmark_loss(outputs["landmarks"], targets["landmarks"])
 
         # shape loss
-        shape_loss = self.shape_loss(outputs["shape"], targets["shape"])
+        shape_loss = self.shape_loss(outputs["shape"], targets["shape"][:, :10])
 
         gt_pose_aa = targets["pose"]  # (B, 52, 3)
-        gt_pose_rotmat = aa2rot(gt_pose_aa)  # (B, 52, 3, 3)
-        gt_global_rot = local_to_global(
-            gt_pose_aa, part="body", output_format="rotmat", input_format="aa"
-        ).reshape(
-            -1, 52, 3, 3
-        )  # (B, 52, 3, 3)
-
-        pelvis = gt_pose_rotmat[:, 0, ...]  # (B, 3, 3) global orientation (pelvis)
-
         pred_pose_6d = outputs["pose"]  # (B, 21, 6)
+
+        with torch.no_grad():
+            gt_pose_rotmat = aa2rot(gt_pose_aa)  # (B, 52, 3, 3)
+            gt_pose_6d = matrix_to_rotation_6d(
+                gt_pose_rotmat[:, 1:22, ...]
+            )  # (B, 21, 6)
+            gt_global_rot = local_to_global(
+                gt_pose_rotmat.reshape(-1, 52 * 9),
+                part="body",
+                output_format="rotmat",
+                input_format="rotmat",
+            ).reshape(-1, 52, 3, 3)
+
+        # pose loss 6d rotations
+        pose_loss = self.pose_loss(pred_pose_6d, gt_pose_6d)
+
         pred_pose_rotmat = rotation_6d_to_matrix(pred_pose_6d)  # (B, 21, 3, 3)
-        cat_pose = torch.cat(
-            [pelvis.unsqueeze(1), pred_pose_rotmat], dim=1
-        )  # (B, 22, 3, 3)
+        full_shape, full_pose = self.get_full_shape_and_pose(
+            outputs["shape"],
+            pred_pose_rotmat,
+            targets["shape"],
+            gt_pose_rotmat,
+        )  # (B, 16), (B, 52, 3, 3)
+
         pred_global_rot = local_to_global(
-            cat_pose.reshape(-1, 22 * 9),
+            full_pose.reshape(-1, 52 * 9),
             part="body",
             output_format="rotmat",
             input_format="rotmat",
-        ).reshape(
-            -1, 22, 3, 3
-        )  # (B, 22, 3, 3)
-
-        # pose loss 6d rotations
-        gt_pose_6d = matrix_to_rotation_6d(gt_pose_rotmat[:, 1:22, ...])  # (B, 21, 6)
-        pose_loss = self.pose_loss(pred_pose_6d, gt_pose_6d)
+        ).reshape(-1, 52, 3, 3)
 
         # Joint rotation loss
-        rot_loss = self.rot_loss(
-            pred_global_rot[:, 1:22, ...], gt_global_rot[:, 1:22, ...]
-        )
+        rot_loss = self.rot_loss(pred_global_rot, gt_global_rot)
 
+        translation = targets["translation"]  # (B, 3)
         # Joint translation loss
         gt_joints = self._get_predicted_joints(
             shape=targets["shape"],
-            global_orient=pelvis.detach(),
-            pose=gt_pose_rotmat[:, 1:22, ...],
+            pose=gt_pose_rotmat,
+            translation=translation,
             require_grad=False,
-        )[:, 1:22, ...]
+        )
         pred_joints = self._get_predicted_joints(
-            shape=outputs["shape"],
-            global_orient=pelvis.detach(),
-            pose=pred_pose_rotmat,
+            shape=full_shape,
+            pose=full_pose,
+            translation=translation,
             require_grad=True,
-        )[:, 1:22, ...]
+        )
 
         joint_loss = self.joint_loss(pred_joints, gt_joints)
 
@@ -176,22 +181,26 @@ class DNNMultiTaskLoss(nn.Module):
             'shape': shape_loss
         }
 
-    def _get_predicted_joints(self, shape, global_orient, pose, require_grad=True):
+    def _get_predicted_joints(self, shape, pose, translation, require_grad=True):
         """
         get joint locs using smplh layer
         Params:
-            shape: (batch_size, 10)
-            global_orient: (batch_size, 3, 3) in rot mat
-            pose: (batch_size, 21, 3, 3) in rot mat
+            shape: (batch_size, 16)
+            pose: (batch_size, 52, 3, 3) in rot mat
+            translation: (batch_size, 3)
             require_grad: Bool. Set True for prediction, set False for ground truth.
         Return:
             joints: (batch_size, 52, 3)
         """
+        print(pose.shape)
         if require_grad:
             smpl_output = self.smplh_layer(
                 betas=shape,
-                global_orient=global_orient,
-                body_pose=pose,
+                global_orient=pose[:, 0],
+                body_pose=pose[:, 1:22],
+                left_hand_pose=pose[:, 22:37],
+                right_hand_pose=pose[:, 37:],
+                transl=translation,
                 return_verts=False,
                 return_full_pose=False,
             )
@@ -199,9 +208,76 @@ class DNNMultiTaskLoss(nn.Module):
             with torch.no_grad():
                 smpl_output = self.smplh_layer(
                     betas=shape,
-                    global_orient=global_orient,
-                    body_pose=pose,
+                    global_orient=pose[:, 0],
+                    body_pose=pose[:, 1:22],
+                    left_hand_pose=pose[:, 22:37],
+                    right_hand_pose=pose[:, 37:],
+                    transl=translation,
                     return_verts=False,
                     return_full_pose=False,
                 )
-        return smpl_output.joints
+        # Optionally include extra key points on face, feet and hands by using all 73 components
+        return smpl_output.joints[:, :52]
+
+    def get_full_shape_and_pose(self, pred_shape, pred_pose, gt_shape, gt_pose):
+        """Use ground-truth values for any missing pose and shape parameters"""
+
+        full_shape = torch.cat(
+            [
+                pred_shape,
+                gt_shape[:, -6:],
+            ],
+            dim=1,
+        )
+        full_pose = torch.cat(
+            [gt_pose[:, 0].unsqueeze(1), pred_pose, gt_pose[:, 22:]], dim=1
+        )
+
+        return full_shape, full_pose
+
+
+if __name__ == "__main__":
+
+    from models.smplx import SMPLHLayer
+    from types import SimpleNamespace
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    config = SimpleNamespace(
+        rot_weight=1.0,  # α_r
+        trans_weight=2.0,  # α_t   (joint‑translation)
+        landmark_weight=10.0,  # α_l
+        pose_weight=1.0,  # α_p
+        shape_weight=1.0,  # α_s
+    )
+
+    smplh_layer = SMPLHLayer(
+        model_path="src/models/smplx/params/smplh",
+        gender="neutral",
+        use_pca=False,
+        flat_hand_mean=True,
+        num_betas=16,
+        dtype=torch.float32,
+    ).to(device)
+
+    criterion = DNNMultiTaskLoss(config, smplh_layer).to(device)
+
+    B, L = 2, 1100
+    dummy_out = dict(
+        pose=torch.randn(B, 21, 6, requires_grad=True, device=device),
+        shape=torch.randn(B, 10, requires_grad=True, device=device),
+        landmarks=torch.randn(B, L, 3, requires_grad=True, device=device),
+    )
+    dummy_tgt = dict(
+        pose=torch.randn(B, 52, 3, device=device),
+        shape=torch.randn(B, 16, device=device),
+        translation=torch.randn(B, 3, device=device),
+        landmarks=torch.randn(B, L, 2, device=device),
+    )
+    loss = criterion(dummy_out, dummy_tgt)["total"]
+    loss.backward()
+
+    assert dummy_out["pose"].grad is not None
+    assert dummy_out["shape"].grad is not None
+    assert dummy_out["landmarks"].grad is not None
+    print("forward / backward OK")

@@ -1,7 +1,6 @@
 import os
 import torch
-import gzip
-import pickle
+import joblib
 from pathlib import Path
 import kornia.augmentation as K
 from torchvision.io import decode_image
@@ -29,8 +28,7 @@ class SynDataset(Dataset):
         ).to(device)
 
         if isinstance(metadata, str):
-            with gzip.open(metadata, "rb") as f:
-                metadata = pickle.load(f)
+            metadata = joblib.load(metadata)
 
         all_uids = list(metadata.keys())
 
@@ -52,7 +50,8 @@ class SynDataset(Dataset):
         kp2d = self.metadata[uid]["ldmks_2d"]
         roi = self.metadata[uid]["roi"]
         pose = self.metadata[uid]["pose"]  # Local axis angle representation!!
-        shape = self.metadata[uid]["shape"][:10]  # only first 10 elements
+        shape = self.metadata[uid]["shape"]
+        translation = self.metadata[uid]["translation"]
 
         # Move to device for augmentation
         img = img.to(self.device).unsqueeze(0)
@@ -75,6 +74,7 @@ class SynDataset(Dataset):
             "landmarks": kp2d.squeeze(0).cpu(),
             "pose": torch.from_numpy(pose).float(),
             "shape": torch.from_numpy(shape).float(),
+            "translation": torch.from_numpy(translation).float(),
         }
 
         return img.squeeze(0).cpu(), target, uid
@@ -83,7 +83,7 @@ class SynDataset(Dataset):
 if __name__ == "__main__":
     dataset = SynDataset(
         img_dir=Path("data/raw/synth_body"),
-        metadata="data/annotations/body_meta.pkl.gz",
+        metadata="data/annotations/body_meta.pkl",
         mode="train",
         device="cuda" if torch.cuda.is_available() else "cpu",
     )
