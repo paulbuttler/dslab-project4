@@ -200,7 +200,6 @@ class DNNMultiTaskLoss(nn.Module):
         Return:
             joints: (batch_size, 52, 3)
         """
-        print(pose.shape)
         if require_grad:
             smpl_output = self.smplh_layer(
                 betas=shape,
