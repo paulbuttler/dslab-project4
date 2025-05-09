@@ -77,6 +77,7 @@ class DNNMultiTaskLoss(nn.Module):
         self.landmark_loss = ProbabilisticLandmarkLoss()
         self.pose_loss = nn.L1Loss()
         self.shape_loss = nn.L1Loss()
+        self.landmark_mse_loss = nn.MSELoss()
 
         self.weights = {
             'rotation': config.rot_weight,
@@ -163,6 +164,11 @@ class DNNMultiTaskLoss(nn.Module):
 
         joint_loss = self.joint_loss(pred_joints, gt_joints)
 
+        mse_loss = self.landmark_mse_loss(
+            outputs["landmarks"][..., :2], targets["landmarks"]
+        )
+        mean_var = torch.exp(outputs["landmarks"][..., 2]).mean()
+
         # total_loss
         total_loss = (
             self.weights['rotation'] * rot_loss +
@@ -173,12 +179,14 @@ class DNNMultiTaskLoss(nn.Module):
         )
 
         return {
-            'total': total_loss,
-            'rotation': rot_loss,
-            'translation': joint_loss,
-            'landmark': landmark_loss,
-            'pose': pose_loss,
-            'shape': shape_loss
+            "total": total_loss,
+            "rotation": rot_loss,
+            "translation": joint_loss,
+            "landmark": landmark_loss,
+            "pose": pose_loss,
+            "shape": shape_loss,
+            "landmark_mse": mse_loss,
+            "mean_var": mean_var,
         }
 
     def _get_predicted_joints(self, shape, pose, translation, require_grad=True):
