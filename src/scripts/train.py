@@ -272,6 +272,7 @@ class Trainer:
                             "val/shape_loss": val_loss["shape"],
                             "val/translation_loss": val_loss["translation"],
                             "val/rotation_loss": val_loss["rotation"],
+                            "val/landmark_mse_loss": val_loss["landmark_mse"],
                             "step": (epoch - 1) * len(self.train_loader)
                             + batch_idx
                             + 1,
@@ -284,6 +285,7 @@ class Trainer:
                 self.val_history["shape"].append(val_loss["shape"])
                 self.val_history["translation"].append(val_loss["translation"])
                 self.val_history["rotation"].append(val_loss["rotation"])
+                self.val_history["landmark_mse"].append(val_loss["landmark_mse"])
 
                 self.model.train()
 
@@ -300,7 +302,15 @@ class Trainer:
     def _validate(self):
         """Validate model"""
         self.model.eval()
-        val_loss = {'total': 0, 'landmark': 0, 'pose': 0, 'shape': 0, 'translation': 0, 'rotation': 0}
+        val_loss = {
+            "total": 0,
+            "landmark": 0,
+            "pose": 0,
+            "shape": 0,
+            "translation": 0,
+            "rotation": 0,
+            "landmark_mse": 0,
+        }
 
         with torch.no_grad():
             for images, targets, _ in tqdm(
@@ -314,7 +324,14 @@ class Trainer:
                 loss_dict = self._compute_loss(outputs, targets)
 
                 for k in val_loss:
-                    val_loss[k] += loss_dict[k].item()
+                    if k != "landmark_mse":
+                        val_loss[k] += loss_dict[k].item()
+
+                # Include standard MSE loss for landmarks as well
+                mse = torch.nn.functional.mse_loss(
+                    outputs["landmarks"][..., :2], targets["landmarks"]
+                )
+                val_loss["landmark_mse"] += mse.item()
 
         # Average losses
         for k in val_loss:
