@@ -27,10 +27,26 @@ class Trainer:
         self.config = config
         self.device = torch.device(config.device)
         # logs and monitor
-        self.train_history = {'total': [], 'rotation': [], 'translation': [], 
-                            'landmark': [], 'pose': [], 'shape': []}
-        self.val_history = {'total': [], 'rotation': [], 'translation': [],
-                           'landmark': [], 'pose': [], 'shape': []}
+        self.train_history = {
+            "total": [],
+            "rotation": [],
+            "translation": [],
+            "landmark": [],
+            "pose": [],
+            "shape": [],
+            "landmark_mse": [],
+            "mean_var": [],
+        }
+        self.val_history = {
+            "total": [],
+            "rotation": [],
+            "translation": [],
+            "landmark": [],
+            "pose": [],
+            "shape": [],
+            "landmark_mse": [],
+            "mean_var": [],
+        }
         # Generate unique run name
         timestamp = datetime.now().strftime('%m%d-%H%M')
         self.run_name = f"{timestamp}_{config.name}_{str(uuid.uuid4())[:5]}"
@@ -199,6 +215,8 @@ class Trainer:
             "shape": 0,
             "translation": 0,
             "rotation": 0,
+            "landmark_mse": 0,
+            "mean_var": 0,
         }
         last_loss = {}
         log_interval = self.config.log_interval
@@ -244,6 +262,8 @@ class Trainer:
                             "train/shape_loss": last_loss["shape"],
                             "train/translation_loss": last_loss["translation"],
                             "train/rotation_loss": last_loss["rotation"],
+                            "train/landmark_mse_loss": last_loss["landmark_mse"],
+                            "train/landmark_mean_var": last_loss["mean_var"],
                             "step": (epoch - 1) * len(self.train_loader)
                             + batch_idx
                             + 1,
@@ -256,9 +276,20 @@ class Trainer:
                 self.train_history["shape"].append(last_loss["shape"])
                 self.train_history["translation"].append(last_loss["translation"])
                 self.train_history["rotation"].append(last_loss["rotation"])
+                self.train_history["landmark_mse"].append(last_loss["landmark_mse"])
+                self.train_history["mean_var"].append(last_loss["mean_var"])
 
                 # reset running loss
-                running_loss = {'total': 0, 'landmark': 0, 'pose': 0, 'shape': 0, 'translation': 0, 'rotation': 0}
+                running_loss = {
+                    "total": 0,
+                    "landmark": 0,
+                    "pose": 0,
+                    "shape": 0,
+                    "translation": 0,
+                    "rotation": 0,
+                    "landmark_mse": 0,
+                    "mean_var": 0,
+                }
 
             # log validation loss
             if (batch_idx + 1) % val_interval == 0:
@@ -273,6 +304,7 @@ class Trainer:
                             "val/translation_loss": val_loss["translation"],
                             "val/rotation_loss": val_loss["rotation"],
                             "val/landmark_mse_loss": val_loss["landmark_mse"],
+                            "val/landmark_mean_var": val_loss["mean_var"],
                             "step": (epoch - 1) * len(self.train_loader)
                             + batch_idx
                             + 1,
@@ -286,6 +318,7 @@ class Trainer:
                 self.val_history["translation"].append(val_loss["translation"])
                 self.val_history["rotation"].append(val_loss["rotation"])
                 self.val_history["landmark_mse"].append(val_loss["landmark_mse"])
+                self.val_history["mean_var"].append(val_loss["mean_var"])
 
                 self.model.train()
 
@@ -310,6 +343,7 @@ class Trainer:
             "translation": 0,
             "rotation": 0,
             "landmark_mse": 0,
+            "mean_var": 0,
         }
 
         with torch.no_grad():
@@ -324,14 +358,7 @@ class Trainer:
                 loss_dict = self._compute_loss(outputs, targets)
 
                 for k in val_loss:
-                    if k != "landmark_mse":
-                        val_loss[k] += loss_dict[k].item()
-
-                # Include standard MSE loss for landmarks as well
-                mse = torch.nn.functional.mse_loss(
-                    outputs["landmarks"][..., :2], targets["landmarks"]
-                )
-                val_loss["landmark_mse"] += mse.item()
+                    val_loss[k] += loss_dict[k].item()
 
         # Average losses
         for k in val_loss:
@@ -396,7 +423,16 @@ class Trainer:
         self.model.load_state_dict(checkpoint['model_state_dict'])
 
         self.model.eval()
-        test_loss = {'total': 0, 'landmark': 0, 'pose': 0, 'shape': 0, 'translation': 0, 'rotation': 0}
+        test_loss = {
+            "total": 0,
+            "landmark": 0,
+            "pose": 0,
+            "shape": 0,
+            "translation": 0,
+            "rotation": 0,
+            "landmark_mse": 0,
+            "mean_var": 0,
+        }
 
         with torch.no_grad():
             for images, targets, _ in tqdm(self.test_loader, desc="Testing"):
