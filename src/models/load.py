@@ -23,7 +23,7 @@ def load_model(run_name) -> MultiTaskDNN:
         backbone_feat_dim=config.backbone_feat_dim,
         mlp_head_hidden_dim=config.mlp_head_hidden_dim,
     ).to(config.device)
-    checkpoint = torch.load(f"./experiments/body/checkpoints/best_model_{run_name}.pth")
+    checkpoint = torch.load(f"./experiments/body/checkpoints/model_epoch_400_{run_name}.pth")
     model.load_state_dict(checkpoint["model_state_dict"])
     print(f"Loaded checkpoint from {checkpoint['epoch']} epoch")
 
@@ -118,7 +118,7 @@ def get_val_dataloader(config, data_root, meta_file, batch_size=16):
 
 
 if __name__ == "__main__":
-    run_name = "0503-2012_Run_2_cont_74664"
+    run_name = "0509-2106_Run_3_cont_b79aa"
     data_root = "./data/raw/synth_body"
     meta_file = "./data/annotations/body_meta.pkl"
 

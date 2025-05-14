@@ -1,0 +1,54 @@
+accumulation_steps: 5
+aug:
+  crop_size: 256.0
+  roi:
+    angle: 25.0
+    scale: [0.05, 0.10]
+    trans: 0.06
+  appearance:
+    probs: 
+      motion_blur: 0.2
+      brightness: 0.4
+      contrast: 0.4
+      hue_saturation: 0.3
+      grayscale: 0.1
+      jpeg: 0.2
+      iso_noise: 0.2
+      cutout: 0.0
+backbone_feat_dim: 512
+backbone_name: hrnet_w48.ms_in1k
+batch_size: 50
+checkpoint: /cluster/home/pbuttler/dslab-project4/checkpoints/model_epoch_150_0505-2336_Run_3_d382e.pth
+cudnn_benchmark: true
+data_root: /cluster/project/hilliges/dsl_4/body/synth_body
+device: cuda:0
+entity: dsl_project4
+epochs: 400
+landmark_weight: 10.0
+log_interval: 200
+lr: 0.0001
+meta_file: /cluster/project/hilliges/dsl_4/body/body_meta.pkl
+min_lr: 1.0e-06
+mlp_head_hidden_dim: 512
+name: Run_3_cont
+num_landmarks: 1100
+num_pose_params: 21
+num_shape_params: 10
+num_workers: 4
+pose_weight: 1.0
+pretrained: true
+project: body_dnn
+rot_weight: 1.0
+save_dir: ../checkpoints
+scheduler_type: cosine
+seed: 42
+shape_weight: 1.0
+smplh_model_path: ./models/smplx/params/smplh
+step_per_period: 20
+test_ratio: 0.0
+trans_weight: 2.0
+val_batch_size: 100
+val_interval: 800
+val_ratio: 0.1
+vis_dir: ../visualization
+weight_decay: 0.01
