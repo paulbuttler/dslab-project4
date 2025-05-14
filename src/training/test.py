@@ -2,7 +2,7 @@ import os
 import torch
 import matplotlib.pyplot as plt
 from utils.config import ConfigManager
-from scripts.train import Trainer
+from training.train import Trainer
 from datasets.transforms import denormalize
 
 import wandb
