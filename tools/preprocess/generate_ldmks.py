@@ -1,13 +1,10 @@
 import argparse
 import json
-import torch
-import pickle
-import gzip
+import joblib
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 from utils import ldmks, extract_roi
-
 
 def main():
 
@@ -15,18 +12,15 @@ def main():
     parser.add_argument("--hand", action="store_true", default=False)
     parser.add_argument("--n-ids", type=int, default=20000)
     args = parser.parse_args()
-    args.data_dir = Path("data/raw/synth_body")
+    args.data_dir = (Path("data/raw/synth_body") if not args.hand else Path("data/raw/synth_hand"))
 
-    vertex_indices = np.int64(
-        np.load("src/visualization/vertices/complete_vertices.npy")
-    )
-    vertex_indices_roi = np.int64(
-        np.load("src/visualization/vertices/body36_vertices.npy")
-    )
+    body_indices = np.int64(np.load("src/visualization/vertices/complete_vertices.npy"))
+    body_indices_roi = np.int64(np.load("src/visualization/vertices/body36_vertices.npy"))
+    hand_indices = np.int64(np.load("src/visualization/vertices/left_hand_vertices.npy"))
 
     body_meta = {}
     body_ldmks_roi = {}
-    body_ldmks_3d = {}
+    hand_meta = {}
 
     for sidx in tqdm(range(args.n_ids), desc="Processing IDs"):
         for fidx in range(5):
@@ -41,35 +35,41 @@ def main():
 
             world_to_camera = np.asarray(metadata["camera"]["world_to_camera"])
             camera_to_image = np.asarray(metadata["camera"]["camera_to_image"])
-            shape = np.array(metadata["body_identity"])
-            pose = np.array(metadata["pose"])
+            shape = np.asarray(metadata["body_identity"])
+            pose = np.asarray(metadata["pose"])
+            translation = np.asarray(metadata["translation"])
 
-            ldmks_3d = ldmks.get_3d_landmarks(
-                metadata, np.concatenate((vertex_indices, vertex_indices_roi))
-            )
-            ldmks_2d = ldmks.project_3d_to_2d(
-                ldmks_3d.squeeze(), camera_to_image, world_to_camera[:3]
-            )
+            if not args.hand:
 
-            body_meta[uid] = {
-                "shape": torch.tensor(shape, dtype=torch.float32),
-                "pose": torch.tensor(pose, dtype=torch.float32),
-                "roi": torch.tensor(
-                    extract_roi.compute_roi(ldmks_2d[-36:]), dtype=torch.float32
-                ),
-                "ldmks_2d": torch.tensor(ldmks_2d[:-36], dtype=torch.float32),
-            }
-            body_ldmks_roi[uid] = ldmks_2d[-36:]
-            body_ldmks_3d[uid] = ldmks_3d.squeeze()[:-36]
+                ldmks_3d = ldmks.get_3d_landmarks(metadata, np.concatenate((body_indices, body_indices_roi)))
+                ldmks_2d = ldmks.project_3d_to_2d(ldmks_3d.squeeze(), camera_to_image, world_to_camera[:3])
+
+                body_meta[uid] = {"shape": shape, 
+                                  "pose": pose, 
+                                  "translation": translation, 
+                                  "roi": extract_roi.compute_roi(landmarks=ldmks_2d[-36:], margin=0.08), 
+                                  "ldmks_2d": ldmks_2d[:-36],}
+                body_ldmks_roi[uid] = ldmks_2d[-36:]
+
+            else:
+
+                ldmks_3d = ldmks.get_3d_landmarks(metadata, hand_indices)
+                ldmks_2d = ldmks.project_3d_to_2d(ldmks_3d.squeeze(), camera_to_image, world_to_camera[:3])
+                
+                hand_meta[uid] = {
+                    "shape": shape,
+                    "pose": pose,
+                    "translation": translation,
+                    "roi": extract_roi.compute_roi(landmarks=ldmks_2d, margin=0.05),
+                    "ldmks_2d": ldmks_2d,
+                }
 
     # Save landmarks and relevant metadata to compressed files
-    torch.save(body_meta, "data/annotations/body_meta.pt")
-
-    with gzip.open("data/annotations/body_ldmks_roi.pkl.gz", "wb") as f:
-        pickle.dump(body_ldmks_roi, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-    with gzip.open("data/annotations/body_ldmks_3d.pkl.gz", "wb") as f:
-        pickle.dump(body_ldmks_3d, f, protocol=pickle.HIGHEST_PROTOCOL)
+    if not args.hand:
+        joblib.dump(body_meta, "data/annotations/body_meta.pkl")
+        joblib.dump(body_ldmks_roi, "data/annotations/body_ldmks_roi.pkl")
+    else:
+        joblib.dump(hand_meta, "data/annotations/hand_meta.pkl")
 
 if __name__ == "__main__":
     main()
