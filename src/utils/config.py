@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 class ConfigManager:
 
-    def __init__(self, config_path: str = "./configs/config.yaml"):
+    def __init__(self, config_path: str = "./training/config.yaml"):
         self.config_path = config_path
         self.config = self._load_config()
         self._process_device_config()

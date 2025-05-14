@@ -7,9 +7,11 @@ from utils.rottrans import (
     aa2rot,
 )
 
+
 class RotationLoss(nn.Module):
     """Rotation loss in rad computed from world space rotation matrices"""
-    def __init__(self, reduction='mean'):
+
+    def __init__(self, reduction="mean"):
         super().__init__()
         self.reduction = reduction
 
@@ -27,15 +29,17 @@ class RotationLoss(nn.Module):
         clipped_trace = torch.clamp((trace - 1.0) / 2.0, -1.0 + 1e-6, 1.0 - 1e-6)
         angle_diffs = torch.acos(clipped_trace)
 
-        if self.reduction == 'mean':
+        if self.reduction == "mean":
             return angle_diffs.mean()
-        elif self.reduction == 'sum':
+        elif self.reduction == "sum":
             return angle_diffs.sum()
         return angle_diffs
 
+
 class JointPositionLoss(nn.Module):
     """L1 loss of joint loc diff"""
-    def __init__(self, reduction='mean'):
+
+    def __init__(self, reduction="mean"):
         super().__init__()
         self.reduction = reduction
 
@@ -47,14 +51,16 @@ class JointPositionLoss(nn.Module):
         """
         l1_loss = torch.abs(pred_joints - gt_joints).sum(dim=-1)
 
-        if self.reduction == 'mean':
+        if self.reduction == "mean":
             return l1_loss.mean()
-        elif self.reduction == 'sum':
+        elif self.reduction == "sum":
             return l1_loss.sum()
         return l1_loss
 
+
 class ProbabilisticLandmarkLoss(nn.Module):
     """2D landmark loss with estimated variance"""
+
     def forward(self, pred, gt):
         """
         Args:
@@ -68,8 +74,10 @@ class ProbabilisticLandmarkLoss(nn.Module):
         loss = log_var + 0.5 * sq_diff * torch.exp(-log_var)
         return loss.mean()
 
+
 class DNNMultiTaskLoss(nn.Module):
     """DNN synthetic loss"""
+
     def __init__(self, config, smplh_layer):
         super().__init__()
         self.rot_loss = RotationLoss()
@@ -80,11 +88,11 @@ class DNNMultiTaskLoss(nn.Module):
         self.landmark_mse_loss = nn.MSELoss()
 
         self.weights = {
-            'rotation': config.rot_weight,
-            'translation': config.trans_weight,
-            'landmark': config.landmark_weight,
-            'pose': config.pose_weight,
-            'shape': config.shape_weight
+            "rotation": config.rot_weight,
+            "translation": config.trans_weight,
+            "landmark": config.landmark_weight,
+            "pose": config.pose_weight,
+            "shape": config.shape_weight,
         }
 
         self.smplh_layer = smplh_layer
@@ -93,11 +101,11 @@ class DNNMultiTaskLoss(nn.Module):
         """
         Args:
             outputs: dict containing at least the following key-value pairs
-                - pose: (B, 21, 6) SMPLH pose params in 6D rotations
-                - shape: (B, 10) SMPLH shape params
+                - pose: (B, J, 6) SMPLH pose params in 6D rotations
                 - landmarks: (B, L, 3) landmarks prediction
+                - (OPTIONAL) shape: (B, 10) SMPLH shape params
 
-            targets: dict containing at least the following key-value pairs
+            targets: dict containing the following key-value pairs
                 - pose: (B, 52, 3) SMPLH pose params in local axis-angle representation
                 - shape: (B, 16) SMPLH shape params
                 - translation: (B, 3) SMPLH translation
@@ -105,20 +113,20 @@ class DNNMultiTaskLoss(nn.Module):
         Return:
             loss: dict containing different terms of loss
         """
+        body = "shape" in outputs  # else using hand model
+
         # 2D landmark loss
         landmark_loss = self.landmark_loss(outputs["landmarks"], targets["landmarks"])
 
         # shape loss
-        shape_loss = self.shape_loss(outputs["shape"], targets["shape"][:, :10])
+        if body:
+            shape_loss = self.shape_loss(outputs["shape"], targets["shape"][:, :10])
 
         gt_pose_aa = targets["pose"]  # (B, 52, 3)
-        pred_pose_6d = outputs["pose"]  # (B, 21, 6)
+        pred_pose_6d = outputs["pose"]  # (B, J, 6)
 
         with torch.no_grad():
             gt_pose_rotmat = aa2rot(gt_pose_aa)  # (B, 52, 3, 3)
-            gt_pose_6d = matrix_to_rotation_6d(
-                gt_pose_rotmat[:, 1:22, ...]
-            )  # (B, 21, 6)
             gt_global_rot = local_to_global(
                 gt_pose_rotmat.reshape(-1, 52 * 9),
                 part="body",
@@ -126,12 +134,17 @@ class DNNMultiTaskLoss(nn.Module):
                 input_format="rotmat",
             ).reshape(-1, 52, 3, 3)
 
+            if body:
+                gt_pose_6d = matrix_to_rotation_6d(gt_pose_rotmat[:, 1:22, ...])  # (B, 21, 6)
+            else:
+                gt_pose_6d = matrix_to_rotation_6d(gt_pose_rotmat[:, 22:37, ...])  # (B, 15, 6)
+
         # pose loss 6d rotations
         pose_loss = self.pose_loss(pred_pose_6d, gt_pose_6d)
 
-        pred_pose_rotmat = rotation_6d_to_matrix(pred_pose_6d)  # (B, 21, 3, 3)
+        pred_pose_rotmat = rotation_6d_to_matrix(pred_pose_6d)  # (B, J, 3, 3)
         full_shape, full_pose = self.get_full_shape_and_pose(
-            outputs["shape"],
+            outputs["shape"] if body else None,
             pred_pose_rotmat,
             targets["shape"],
             gt_pose_rotmat,
@@ -143,9 +156,6 @@ class DNNMultiTaskLoss(nn.Module):
             output_format="rotmat",
             input_format="rotmat",
         ).reshape(-1, 52, 3, 3)
-
-        # Joint rotation loss
-        rot_loss = self.rot_loss(pred_global_rot, gt_global_rot)
 
         translation = targets["translation"]  # (B, 3)
         # Joint translation loss
@@ -161,33 +171,41 @@ class DNNMultiTaskLoss(nn.Module):
             translation=translation,
             require_grad=True,
         )
+        if not body:
+            gt_global_rot = gt_global_rot[:, 22:37]
+            pred_global_rot = pred_global_rot[:, 22:37]
+            gt_joints = gt_joints[:, 22:37]
+            pred_joints = pred_joints[:, 22:37]
 
+        # Joint rotation and translation loss
+        rot_loss = self.rot_loss(pred_global_rot, gt_global_rot)
         joint_loss = self.joint_loss(pred_joints, gt_joints)
 
-        mse_loss = self.landmark_mse_loss(
-            outputs["landmarks"][..., :2], targets["landmarks"]
-        )
+        mse_loss = self.landmark_mse_loss(outputs["landmarks"][..., :2], targets["landmarks"])
         mean_var = torch.exp(outputs["landmarks"][..., 2]).mean()
 
         # total_loss
         total_loss = (
-            self.weights['rotation'] * rot_loss +
-            self.weights['translation'] * joint_loss +
-            self.weights['landmark'] * landmark_loss +
-            self.weights['pose'] * pose_loss +
-            self.weights['shape'] * shape_loss
+            self.weights["rotation"] * rot_loss
+            + self.weights["translation"] * joint_loss
+            + self.weights["landmark"] * landmark_loss
+            + self.weights["pose"] * pose_loss
+            + (self.weights["shape"] * shape_loss if body else 0.0)
         )
 
-        return {
-            "total": total_loss,
+        loss_dict =  {"total": total_loss,
             "rotation": rot_loss,
             "translation": joint_loss,
             "landmark": landmark_loss,
             "pose": pose_loss,
-            "shape": shape_loss,
             "landmark_mse": mse_loss,
-            "mean_var": mean_var,
-        }
+            "mean_var": mean_var
+            }
+        
+        if body:
+            loss_dict["shape"] = shape_loss
+
+        return loss_dict
 
     def _get_predicted_joints(self, shape, pose, translation, require_grad=True):
         """
@@ -229,20 +247,17 @@ class DNNMultiTaskLoss(nn.Module):
     def get_full_shape_and_pose(self, pred_shape, pred_pose, gt_shape, gt_pose):
         """Use ground-truth values for any missing pose and shape parameters"""
 
-        full_shape = torch.cat(
-            [
-                pred_shape,
-                gt_shape[:, -6:],
-            ],
-            dim=1,
-        )
-        full_pose = torch.cat(
-            [gt_pose[:, 0].unsqueeze(1), pred_pose, gt_pose[:, 22:]], dim=1
-        )
+        if pred_shape is None:  # Hand model
+            full_shape = gt_shape
+            full_pose = torch.cat([gt_pose[:, :22], pred_pose, gt_pose[:, 37:]], dim=1)
+        else:
+            full_shape = torch.cat([pred_shape, gt_shape[:, -6:]], dim=1)
+            full_pose = torch.cat([gt_pose[:, 0].unsqueeze(1), pred_pose, gt_pose[:, 22:]], dim=1)
 
         return full_shape, full_pose
 
 
+# Test loss function implementation
 if __name__ == "__main__":
 
     from models.smplx import SMPLHLayer

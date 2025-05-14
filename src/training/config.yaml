@@ -1,0 +1,71 @@
+# wandb settings
+name: Test
+entity: dsl_project4
+project: hand_dnn
+
+# Training parameters
+device: auto
+seed: 42
+epochs: 300               # 600 for body, 300 for hand
+batch_size: 128           # 256 
+accumulation_steps: 2     # simulates larger batch size
+val_batch_size: 128
+lr: 0.0001                # 0.0001 
+weight_decay: 0.01
+scheduler_type: cosine    # cosine 
+min_lr: 0.000001 
+step_per_period: 20       # for cosine warm restart scheduler (if used)
+
+# Model parameters
+backbone_name: hrnet_w18.ms_in1k  # hrnet_w48.ms_in1k for body, hrnet_w18.ms_in1k for hand
+pretrained: True
+checkpoint: None
+smplh_model_path: ./models/smplx/params/smplh
+backbone_feat_dim: 512
+mlp_head_hidden_dim: 512
+
+# Targets
+num_landmarks: 137       # 1100 for body, 137 for hand
+num_pose_params: 15       # 21 for body, 15 for hand
+num_shape_params: 0      # 10 for body, 0 for hand
+
+# Augmentation
+aug:
+  crop_size: 128.0        # 256.0 for body, 128.0 for hand
+  roi:                    # use smaller values for the hand
+    angle: 15.0           
+    scale: [0.04, 0.08]
+    trans: 0.04
+  appearance:
+    probs: 
+      motion_blur: 0.2
+      brightness: 0.4
+      contrast: 0.4
+      hue_saturation: 0.3
+      grayscale: 0.1
+      jpeg: 0.2
+      iso_noise: 0.0      # 0.0 for hand
+      cutout: 0.2         # 0.0 for body
+
+# Loss weights
+landmark_weight: 10.0     # 10.0
+pose_weight: 1.0          # 1.0 
+trans_weight: 2.0         # 2.0
+rot_weight: 1.0           # 1.0
+shape_weight: 0.0         # 1.0 for body, 0.0 for hand
+
+# Log settings 
+log_interval: 200 
+val_interval: 800
+
+# Data parameters
+data_root: C:\Users\Paul\Documents\dslab-project4\data\raw\synth_hand ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
+meta_file: C:\Users\Paul\Documents\dslab-project4\data\annotations\hand_meta.pkl ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
+val_ratio: 0.1
+test_ratio: 0.0
+num_workers: 4
+
+# System parameters
+cudnn_benchmark: True
+save_dir: ../checkpoints
+vis_dir: ../visualization
