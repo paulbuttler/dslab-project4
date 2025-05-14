@@ -32,8 +32,8 @@ def random_roi_transform(
     img: torch.Tensor,
     kp2d: torch.Tensor,
     roi: torch.Tensor,
-    mode: str = "train",
-    crop_size: float = 256.0,
+    roi_aug: dict,
+    crop_size: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Randomly apply a rotation, scaling, and translation to the image and keypoints,
@@ -42,19 +42,23 @@ def random_roi_transform(
     device = img.device
     B = img.shape[0]
 
-    # Use a triangular distribution for simple sampling around the ideal ROI
-    angle = sample_triangular(-25.0, 25.0, 0.0, (B,), device=device)
+    angle = roi_aug["angle"]
+    scale = roi_aug["scale"]
+    trans = roi_aug["trans"]
 
-    scale_offset = sample_triangular(-0.05, 0.10, 0.0, (B,), device=device)
+    # Use a triangular distribution for simple sampling around the ideal ROI
+    angle = sample_triangular(-angle, angle, 0.0, (B,), device=device)
+
+    scale_offset = sample_triangular(scale[0], scale[1], 0.0, (B,), device=device)
     scale = (1.0 + scale_offset).unsqueeze(1).expand(-1, 2)
 
     roi_w = roi[:, 2] - roi[:, 0]
-    tx = sample_triangular(-0.06, 0.06, 0.0, (B,), device=device) * roi_w
-    ty = sample_triangular(-0.06, 0.06, 0.0, (B,), device=device) * roi_w
+    tx = sample_triangular(-trans, trans, 0.0, (B,), device=device) * roi_w
+    ty = sample_triangular(-trans, trans, 0.0, (B,), device=device) * roi_w
     translation = torch.stack([tx, ty], dim=1)
 
     return apply_roi_transform(
-        img, kp2d, roi, mode, crop_size, angle, scale, translation
+        img, kp2d, roi, "train", crop_size, angle, scale, translation
     )
 
 
@@ -115,17 +119,12 @@ def apply_roi_transform(
 
 
 class AppearanceAugmentation(nn.Module):
-    def __init__(self):
+
+    def __init__(self, appearance_aug: dict):
         super().__init__()
-        self.probs = {
-            "motion_blur": 0.2,
-            "brightness": 0.4,
-            "contrast": 0.4,
-            "hue_saturation": 0.3,
-            "grayscale": 0.1,
-            "jpeg": 0.2,
-            "iso_noise": 0.2,
-        }
+
+        self.probs = appearance_aug["probs"]
+
         # Built-in Kornia augmentations
         self.colorjitter = K.ColorJitter(
             hue=0.05, saturation=0.15, p=self.probs["hue_saturation"]
@@ -133,12 +132,18 @@ class AppearanceAugmentation(nn.Module):
         self.grayscale = K.RandomGrayscale(p=self.probs["grayscale"])
         self.jpeg = K.RandomJPEG(jpeg_quality=(50, 95), p=self.probs["jpeg"])
 
+        self.random_erasing = K.RandomErasing(
+            p=self.probs["cutout"],
+            scale=(0.02, 0.12),
+            ratio=(0.5, 2.0),
+        )
+
     def forward(self, img: torch.Tensor):
 
         device = img.device
 
         # Motion blur with kernel size propotional to image size
-        if torch.rand(1, device=device) < self.probs["motion_blur"]:
+        if torch.rand(1) < self.probs["motion_blur"]:
             kernel_size = max(3, min(12, int(img.shape[-1] * 0.02) | 1))  # Force odd
             angle = torch.rand(1, device=device) * 360
             direction = torch.rand(1, device=device) * 2 - 1
@@ -147,14 +152,17 @@ class AppearanceAugmentation(nn.Module):
             )
 
         # Brightness (constant shift)
-        if torch.rand(1, device=device) < self.probs["brightness"]:
+        if torch.rand(1) < self.probs["brightness"]:
             offset = torch.rand(1, device=device) * 0.3 - 0.15
             img = (img + offset).clamp(0, 1)
 
         # Contrast adjustment
-        if torch.rand(1, device=device) < self.probs["contrast"]:
+        if torch.rand(1) < self.probs["contrast"]:
             contrast = torch.rand(1, device=device) * 0.5 - 0.25
             img = ((img - 0.5) * (1 + contrast) + 0.5).clamp(0, 1)
+
+        # Random erasing (as a replacement for overlaying occluders) for hand images
+        img = self.random_erasing(img)
 
         # Hue and saturation, grayscale and JPEG compression
         img = self.colorjitter(img)
@@ -163,7 +171,7 @@ class AppearanceAugmentation(nn.Module):
         img = self.jpeg(img.to("cpu")).to(device)
 
         # ISO noise
-        if torch.rand(1, device=device) < self.probs["iso_noise"]:
+        if torch.rand(1) < self.probs["iso_noise"]:
             img = (
                 torch.poisson(img * 512) / 512 + torch.randn_like(img) * 0.002
             ).clamp(0, 1)

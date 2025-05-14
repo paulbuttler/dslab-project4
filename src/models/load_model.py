@@ -2,7 +2,7 @@ import torch
 from models.model import MultiTaskDNN
 from utils.config import ConfigManager
 from datasets.transforms import denormalize
-from utils.rottrans import rotation_6d_to_matrix, rot2aa
+from utils.rottrans import rotation_6d_to_matrix, aa2rot
 from datasets.synth_dataset import SynDataset
 from torch.utils.data import DataLoader
 
@@ -29,6 +29,7 @@ def load_model(run_name) -> MultiTaskDNN:
 
     return model, config
 
+
 def get_predictions(model, batch, device):
     """
     Get ground truth data and model predictions from a dataset batch.
@@ -45,10 +46,9 @@ def get_predictions(model, batch, device):
         pred_ldmks = (outputs["landmarks"][..., :2] * h).cpu()
         pred_std = (torch.exp(0.5 * outputs["landmarks"][..., 2]) * h).cpu()
         pred_pose = outputs["pose"].cpu()
-        pred_shape = outputs["shape"].cpu()
+        pred_shape = outputs["shape"].cpu() if "shape" in outputs else None
 
-        pred_pose = rotation_6d_to_matrix(pred_pose)  # [B, 21, 3, 3]
-        pred_pose = rot2aa(pred_pose)  # [B, 21, 3]
+        pred_pose = rotation_6d_to_matrix(pred_pose)  # [B, J, 3, 3]
 
     images = denormalize(images).cpu()  # [B, 3, H, W]
 
@@ -70,11 +70,25 @@ def get_predictions(model, batch, device):
         pred_pose,
     )
 
+
+def get_full_shape_and_pose(pred_shape, pred_pose, gt_shape, gt_pose):
+    """Use ground-truth values for any missing pose and shape parameters"""
+    if pred_shape is None:  # Hand model
+        full_shape = gt_shape
+        full_pose = torch.cat([gt_pose[:, :22], pred_pose, gt_pose[:, 37:]], dim=1)
+    else:
+        full_shape = torch.cat([pred_shape, gt_shape[:, -6:]], dim=1)
+        full_pose = torch.cat([gt_pose[:, 0].unsqueeze(1), pred_pose, gt_pose[:, 22:]], dim=1)
+
+    return full_shape, full_pose
+
+
 def get_val_dataloader(config, data_root, meta_file, batch_size=16):
     """
     Initialize validation dataloader that was used for training.
     """
-    full_length = 95575
+    body = "body" in config.meta_file
+    full_length = 95575 if body else 99200
 
     # Create dataset splits
     val_size = int(full_length * config.val_ratio)
@@ -82,11 +96,12 @@ def get_val_dataloader(config, data_root, meta_file, batch_size=16):
     train_size = full_length - val_size - test_size
 
     all_indices = torch.randperm(full_length, generator=torch.Generator().manual_seed(config.seed))
-    val_indices = all_indices[train_size:train_size + val_size]
+    val_indices = all_indices[train_size : train_size + val_size]
 
     val_set = SynDataset(
         img_dir=data_root,
         metadata=meta_file,
+        aug=config.aug,
         indices=val_indices,
         mode="test",
         device=config.device,
@@ -124,3 +139,6 @@ if __name__ == "__main__":
         pred_shape,
         pred_pose,
     ) = get_predictions(model, batch, config.device)
+
+    # Concatenated ground truth rotation matrices
+    full_shape, full_pose = get_full_shape_and_pose(pred_shape, pred_pose, gt_shape, aa2rot(gt_pose))

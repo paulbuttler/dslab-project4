@@ -10,7 +10,7 @@ from datasets.synth_dataset import SynDataset
 from models.model import MultiTaskDNN
 from models.smplx import SMPLHLayer
 from utils.config import ConfigManager
-from utils.losses import DNNMultiTaskLoss
+from training.losses import DNNMultiTaskLoss
 from tqdm import tqdm
 import yaml
 import joblib
@@ -22,10 +22,12 @@ import multiprocessing as mp
 
 mp.set_start_method("spawn", force=True)
 
+
 class Trainer:
     def __init__(self, config):
         self.config = config
         self.device = torch.device(config.device)
+        self.body = "body" in self.config.meta_file
         # logs and monitor
         self.train_history = {
             "total": [],
@@ -33,7 +35,6 @@ class Trainer:
             "translation": [],
             "landmark": [],
             "pose": [],
-            "shape": [],
             "landmark_mse": [],
             "mean_var": [],
         }
@@ -43,12 +44,14 @@ class Trainer:
             "translation": [],
             "landmark": [],
             "pose": [],
-            "shape": [],
             "landmark_mse": [],
             "mean_var": [],
         }
+        if self.body:
+            self.train_history["shape"] = []
+            self.val_history["shape"] = []
         # Generate unique run name
-        timestamp = datetime.now().strftime('%m%d-%H%M')
+        timestamp = datetime.now().strftime("%m%d-%H%M")
         self.run_name = f"{timestamp}_{config.name}_{str(uuid.uuid4())[:5]}"
         # Init wandb logger
         wandb_logger = WandbLogger(
@@ -80,16 +83,15 @@ class Trainer:
 
     def _init_datasets(self):
         """Initialize datasets with splits"""
-        full_length = 95575
+
+        full_length = 95575 if self.body else 99200
 
         # Create dataset splits
         val_size = int(full_length * self.config.val_ratio)
         test_size = int(full_length * self.config.test_ratio)
         train_size = full_length - val_size - test_size
 
-        all_indices = torch.randperm(
-            full_length, generator=torch.Generator().manual_seed(self.config.seed)
-        )
+        all_indices = torch.randperm(full_length, generator=torch.Generator().manual_seed(self.config.seed))
         train_indices = all_indices[:train_size]
         val_indices = all_indices[train_size : train_size + val_size]
 
@@ -99,6 +101,7 @@ class Trainer:
         train_set = SynDataset(
             img_dir=self.config.data_root,
             metadata=meta,
+            aug=config.aug,
             indices=train_indices,
             mode="train",
             device=self.config.device,
@@ -106,6 +109,7 @@ class Trainer:
         val_set = SynDataset(
             img_dir=self.config.data_root,
             metadata=meta,
+            aug=config.aug,
             indices=val_indices,
             mode="test",
             device=self.config.device,
@@ -115,6 +119,7 @@ class Trainer:
             self.test_set = SynDataset(
                 img_dir=self.config.data_root,
                 metadata=meta,
+                aug=config.aug,
                 indices=test_indices,
                 mode="test",
                 device=self.config.device,
@@ -152,9 +157,7 @@ class Trainer:
         """Initialize model and move to device"""
         self.model = MultiTaskDNN(
             backbone_name=self.config.backbone_name,
-            pretrained=(
-                self.config.pretrained if self.config.checkpoint == "None" else False
-            ),
+            pretrained=(self.config.pretrained if self.config.checkpoint == "None" else False),
             num_landmarks=self.config.num_landmarks,
             num_pose_params=self.config.num_pose_params,
             num_shape_params=self.config.num_shape_params,
@@ -212,12 +215,13 @@ class Trainer:
             "total": 0,
             "landmark": 0,
             "pose": 0,
-            "shape": 0,
             "translation": 0,
             "rotation": 0,
             "landmark_mse": 0,
             "mean_var": 0,
         }
+        if self.body:
+            running_loss["shape"] = 0
         last_loss = {}
         log_interval = self.config.log_interval
         val_interval = self.config.val_interval
@@ -229,9 +233,7 @@ class Trainer:
             tqdm(self.train_loader, desc=f"Epoch {epoch} Training", leave=False)
         ):
             images = images.to(self.device, non_blocking=True)
-            targets = {
-                k: v.to(self.device, non_blocking=True) for k, v in targets.items()
-            }
+            targets = {k: v.to(self.device, non_blocking=True) for k, v in targets.items()}
 
             outputs = self.model(images)
             loss_dict = self._compute_loss(outputs, targets)
@@ -254,26 +256,23 @@ class Trainer:
                     last_loss[k] = running_loss[k] / log_interval
 
                 if self.wandb_logger:
-                    self.wandb_logger.log_metrics(
-                        {
+                    log_data = {
                             "train/total_loss": last_loss["total"],
                             "train/landmark_loss": last_loss["landmark"],
                             "train/pose_loss": last_loss["pose"],
-                            "train/shape_loss": last_loss["shape"],
                             "train/translation_loss": last_loss["translation"],
                             "train/rotation_loss": last_loss["rotation"],
                             "train/landmark_mse_loss": last_loss["landmark_mse"],
                             "train/landmark_mean_var": last_loss["mean_var"],
-                            "step": (epoch - 1) * len(self.train_loader)
-                            + batch_idx
-                            + 1,
+                            "step": (epoch - 1) * len(self.train_loader) + batch_idx + 1,
                         }
-                    )
+                    if self.body:
+                        log_data["train/shape_loss"] = last_loss["shape"]
+                    self.wandb_logger.log_metrics(log_data)
 
                 self.train_history["total"].append(last_loss["total"])
                 self.train_history["landmark"].append(last_loss["landmark"])
                 self.train_history["pose"].append(last_loss["pose"])
-                self.train_history["shape"].append(last_loss["shape"])
                 self.train_history["translation"].append(last_loss["translation"])
                 self.train_history["rotation"].append(last_loss["rotation"])
                 self.train_history["landmark_mse"].append(last_loss["landmark_mse"])
@@ -284,49 +283,50 @@ class Trainer:
                     "total": 0,
                     "landmark": 0,
                     "pose": 0,
-                    "shape": 0,
                     "translation": 0,
                     "rotation": 0,
                     "landmark_mse": 0,
                     "mean_var": 0,
                 }
+                if self.body:
+                    self.train_history["shape"].append(last_loss["shape"])
+                    running_loss["shape"] = 0
 
             # log validation loss
             if (batch_idx + 1) % val_interval == 0:
                 val_loss = self._validate()
                 if self.wandb_logger:
-                    self.wandb_logger.log_metrics(
-                        {
+                    log_data = {
                             "val/total_loss": val_loss["total"],
                             "val/landmark_loss": val_loss["landmark"],
                             "val/pose_loss": val_loss["pose"],
-                            "val/shape_loss": val_loss["shape"],
                             "val/translation_loss": val_loss["translation"],
                             "val/rotation_loss": val_loss["rotation"],
                             "val/landmark_mse_loss": val_loss["landmark_mse"],
                             "val/landmark_mean_var": val_loss["mean_var"],
-                            "step": (epoch - 1) * len(self.train_loader)
-                            + batch_idx
-                            + 1,
+                            "step": (epoch - 1) * len(self.train_loader) + batch_idx + 1,
                         }
-                    )
+                    if self.body: 
+                        log_data["val/shape_loss"] = val_loss["shape"]
+                        
+                    self.wandb_logger.log_metrics(log_data)
 
                 self.val_history["total"].append(val_loss["total"])
                 self.val_history["landmark"].append(val_loss["landmark"])
                 self.val_history["pose"].append(val_loss["pose"])
-                self.val_history["shape"].append(val_loss["shape"])
                 self.val_history["translation"].append(val_loss["translation"])
                 self.val_history["rotation"].append(val_loss["rotation"])
                 self.val_history["landmark_mse"].append(val_loss["landmark_mse"])
                 self.val_history["mean_var"].append(val_loss["mean_var"])
 
+                if self.body: 
+                    self.val_history["shape"].append(val_loss["shape"]) 
+
                 self.model.train()
 
         # step the scheduler after each epoch and log the learning rate
         if self.wandb_logger:
-            wandb.log(
-                {"epoch": epoch, "learning_rate": self.optimizer.param_groups[0]["lr"]}
-            )
+            wandb.log({"epoch": epoch, "learning_rate": self.optimizer.param_groups[0]["lr"]})
         if self.scheduler is not None:
             self.scheduler.step()
 
@@ -339,21 +339,18 @@ class Trainer:
             "total": 0,
             "landmark": 0,
             "pose": 0,
-            "shape": 0,
             "translation": 0,
             "rotation": 0,
             "landmark_mse": 0,
             "mean_var": 0,
         }
+        if self.body:
+            val_loss["shape"] = 0
 
         with torch.no_grad():
-            for images, targets, _ in tqdm(
-                self.val_loader, desc="Validating", leave=False
-            ):
+            for images, targets, _ in tqdm(self.val_loader, desc="Validating", leave=False):
                 images = images.to(self.device, non_blocking=True)
-                targets = {
-                    k: v.to(self.device, non_blocking=True) for k, v in targets.items()
-                }
+                targets = {k: v.to(self.device, non_blocking=True) for k, v in targets.items()}
                 outputs = self.model(images)
                 loss_dict = self._compute_loss(outputs, targets)
 
@@ -404,42 +401,33 @@ class Trainer:
                         "loss": loss,
                         "model_state_dict": self.model.state_dict(),
                         "optimizer_state_dict": self.optimizer.state_dict(),
-                        "scheduler_state_dict": (
-                            self.scheduler.state_dict()
-                            if self.scheduler is not None
-                            else None
-                        ),
+                        "scheduler_state_dict": (self.scheduler.state_dict() if self.scheduler is not None else None),
                     },
-                    os.path.join(
-                        self.config.save_dir, f"{model_name}_{self.run_name}.pth"
-                    ),
+                    os.path.join(self.config.save_dir, f"{model_name}_{self.run_name}.pth"),
                 )
 
     def test(self):
         """Final test on test set"""
-        checkpoint = torch.load(
-            os.path.join(self.config.save_dir, f"best_model{self.run_name}.pth")
-        )
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        checkpoint = torch.load(os.path.join(self.config.save_dir, f"best_model{self.run_name}.pth"))
+        self.model.load_state_dict(checkpoint["model_state_dict"])
 
         self.model.eval()
         test_loss = {
             "total": 0,
             "landmark": 0,
             "pose": 0,
-            "shape": 0,
             "translation": 0,
             "rotation": 0,
             "landmark_mse": 0,
             "mean_var": 0,
         }
+        if self.body:
+            test_loss["shape"] = 0
 
         with torch.no_grad():
             for images, targets, _ in tqdm(self.test_loader, desc="Testing"):
                 images = images.to(self.device, non_blocking=True)
-                targets = {
-                    k: v.to(self.device, non_blocking=True) for k, v in targets.items()
-                }
+                targets = {k: v.to(self.device, non_blocking=True) for k, v in targets.items()}
 
                 outputs = self.model(images)
                 loss_dict = self._compute_loss(outputs, targets)
@@ -455,6 +443,7 @@ class Trainer:
         for _, (key, value) in enumerate(test_loss.items()):
             print(f"{key} loss: {value:.4f}")
 
+
 if __name__ == "__main__":
     # Load configuration
     config_manager = ConfigManager()
@@ -467,9 +456,7 @@ if __name__ == "__main__":
     trainer = Trainer(config)
 
     # Save config for reproducibility
-    with open(
-        os.path.join(config.save_dir, f"config_{trainer.run_name}.yaml"), "w"
-    ) as f:
+    with open(os.path.join(config.save_dir, f"config_{trainer.run_name}.yaml"), "w") as f:
         yaml.dump(vars(config), f)
 
     # Run training
