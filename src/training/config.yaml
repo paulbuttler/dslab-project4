@@ -1,5 +1,5 @@
 # wandb settings
-name: Test
+name: Run_1
 entity: dsl_project4
 project: hand_dnn
 
@@ -55,12 +55,12 @@ rot_weight: 1.0           # 1.0
 shape_weight: 0.0         # 1.0 for body, 0.0 for hand
 
 # Log settings 
-log_interval: 200 
-val_interval: 800
+log_interval: 100 
+val_interval: 300
 
 # Data parameters
-data_root: C:\Users\Paul\Documents\dslab-project4\data\raw\synth_hand ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
-meta_file: C:\Users\Paul\Documents\dslab-project4\data\annotations\hand_meta.pkl ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
+data_root: /cluster/project/hilliges/dsl_4/hand/synth_hand ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
+meta_file: /cluster/project/hilliges/dsl_4/hand/hand_meta.pkl ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
 val_ratio: 0.1
 test_ratio: 0.0
 num_workers: 4
