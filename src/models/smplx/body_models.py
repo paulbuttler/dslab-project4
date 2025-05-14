@@ -146,10 +146,10 @@ class SMPL(nn.Module):
         self.batch_size = batch_size
         shapedirs = data_struct.shapedirs
         if (shapedirs.shape[-1] < self.SHAPE_SPACE_DIM):
-            print(f'WARNING: You are using a {self.name()} model, with only'
-                  f' {shapedirs.shape[-1]} shape coefficients.\n'
-                  f'num_betas={num_betas}, shapedirs.shape={shapedirs.shape}, '
-                  f'self.SHAPE_SPACE_DIM={self.SHAPE_SPACE_DIM}')
+            # print(f'WARNING: You are using a {self.name()} model, with only'
+            #       f' {shapedirs.shape[-1]} shape coefficients.\n'
+            #       f'num_betas={num_betas}, shapedirs.shape={shapedirs.shape}, '
+            #       f'self.SHAPE_SPACE_DIM={self.SHAPE_SPACE_DIM}')
             num_betas = min(num_betas, shapedirs.shape[-1])
         else:
             num_betas = min(num_betas, self.SHAPE_SPACE_DIM)

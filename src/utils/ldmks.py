@@ -1,4 +1,4 @@
-"""Parts of the code are copied from the repository: https://github.com/microsoft/SynthMoCap released under the MIT license."""
+# Parts of the code are copied from the repository: https://github.com/microsoft/SynthMoCap released under the MIT license.
 
 import os
 import cv2
@@ -6,6 +6,7 @@ import numpy as np
 from contextlib import redirect_stdout
 from aitviewer.models.smpl import SMPLLayer  # type: ignore
 from aitviewer.renderables.smpl import SMPLSequence  # type: ignore
+
 
 def draw_landmarks(
     img: np.ndarray,
@@ -23,14 +24,10 @@ def draw_landmarks(
     img_size = (img.shape[1], img.shape[0])
 
     if connectivity is not None:
-        ldmk_connection_pairs = ldmks_2d[np.asarray(connectivity).astype(int)].astype(
-            int
-        )
+        ldmk_connection_pairs = ldmks_2d[np.asarray(connectivity).astype(int)].astype(int)
 
         for p_0, p_1 in ldmk_connection_pairs:
-            cv2.line(
-                img, tuple(p_0 + 1), tuple(p_1 + 1), (0, 0, 0), thickness, cv2.LINE_AA
-            )
+            cv2.line(img, tuple(p_0 + 1), tuple(p_1 + 1), (0, 0, 0), thickness, cv2.LINE_AA)
         for p_0, p_1 in ldmk_connection_pairs:
             cv2.line(img, tuple(p_0), tuple(p_1), color, thickness, cv2.LINE_AA)
 
@@ -41,7 +38,7 @@ def draw_landmarks(
                 tuple(ldmk + 1),
                 thickness + (1 if connectivity is not None else 0),
                 (0, 0, 0),
-                1,
+                -1,
                 cv2.LINE_AA,
             )
             cv2.circle(
@@ -49,7 +46,7 @@ def draw_landmarks(
                 tuple(ldmk),
                 thickness + (1 if connectivity is not None else 0),
                 color,
-                1,
+                -1,
                 cv2.LINE_AA,
             )
 
