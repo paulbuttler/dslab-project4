@@ -2,7 +2,8 @@ __pycache__/
 .vscode/
 data/
 wandb/
-experiments/body/
+experiments/checkpoints/
+experiments/synth_data/
 tools/visualize/smplh/
 src/models/smplx/params/
 imgui.ini

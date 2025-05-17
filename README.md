@@ -64,13 +64,14 @@ Optional flags include
 For training, a subset of the earlier-installed dependencies is sufficient.
 We recommend creating a new environment using the dependencies listed in `requirements_euler.txt`.
 
-Navigate to the `src` directory and set training parameters in `training/config.yaml`. 
+Navigate to the `src` directory and set training parameters in `training/body.yaml` or `training/hand.yaml` respectively. 
 Parameters documented in the paper are marked with comments; the rest may require further tuning.
 
-To start training:
+To start training the body model:
 ```
 python training/train.py
 ```
+To train the hand model include the flag `--hand`.
 
 ## Acknowledgments
 We thank the authors of [Look Ma, no markers](https://microsoft.github.io/SynthMoCap/) for providing synthetic datasets and code that supports this implementation.

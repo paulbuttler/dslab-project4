@@ -121,11 +121,12 @@ if __name__ == "__main__":
     meta_file = args.data_dir / f"metadata_{args.sidx:07d}_{args.fidx:03d}.json"
     img_file = args.data_dir / f"img_{args.sidx:07d}_{args.fidx:03d}.jpg"
 
+    if not img_file.exists() or not meta_file.exists():
+        print(f"Image or metadata file not found: {img_file} or {meta_file}")
+        exit(1)
+
     with open(meta_file, "r") as f:
         metadata = json.load(f)
-    if not img_file.exists():
-        print(f"File not found: {img_file}")
-        exit(1)
 
     # Convert json metadata to NumPy arrays.
     ldmks_2d = np.asarray(metadata["landmarks"]["2D"])
