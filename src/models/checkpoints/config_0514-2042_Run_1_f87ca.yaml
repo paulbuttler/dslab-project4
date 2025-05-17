@@ -1,0 +1,56 @@
+accumulation_steps: 1
+aug:
+  appearance:
+    probs:
+      brightness: 0.4
+      contrast: 0.4
+      cutout: 0.2
+      grayscale: 0.1
+      hue_saturation: 0.3
+      iso_noise: 0.0
+      jpeg: 0.2
+      motion_blur: 0.2
+  crop_size: 128.0
+  roi:
+    angle: 15.0
+    scale:
+    - 0.04
+    - 0.08
+    trans: 0.04
+backbone_feat_dim: 512
+backbone_name: hrnet_w18.ms_in1k
+batch_size: 256
+checkpoint: None
+cudnn_benchmark: true
+data_root: /cluster/project/hilliges/dsl_4/hand/synth_hand
+device: cuda:0
+entity: dsl_project4
+epochs: 300
+landmark_weight: 10.0
+log_interval: 50
+lr: 0.0001
+meta_file: /cluster/project/hilliges/dsl_4/hand/hand_meta.pkl
+min_lr: 1.0e-06
+mlp_head_hidden_dim: 512
+name: Run_1
+num_landmarks: 137
+num_pose_params: 15
+num_shape_params: 0
+num_workers: 4
+pose_weight: 1.0
+pretrained: true
+project: hand_dnn
+rot_weight: 1.0
+save_dir: ../checkpoints
+scheduler_type: cosine
+seed: 42
+shape_weight: 0.0
+smplh_model_path: ./models/smplx/params/smplh
+step_per_period: 20
+test_ratio: 0.0
+trans_weight: 2.0
+val_batch_size: 256
+val_interval: 150
+val_ratio: 0.1
+vis_dir: ../visualization
+weight_decay: 0.01
