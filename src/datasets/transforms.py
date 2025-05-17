@@ -8,6 +8,13 @@ from kornia.geometry.transform import (
 )
 
 
+def normalize(img, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+    """Normalize an image tensor with ImageNet mean and std."""
+    mean = torch.tensor(mean, device=img.device).view(1, -1, 1, 1)
+    std = torch.tensor(std, device=img.device).view(1, -1, 1, 1)
+    return (img - mean) / std
+
+
 def denormalize(img, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
     """Denormalize an image tensor with ImageNet mean and std."""
     mean = torch.tensor(mean, device=img.device).view(1, -1, 1, 1)
@@ -112,6 +119,10 @@ def apply_roi_transform(
 
     # Warp image and keypoints
     img_warped = warp_affine(img, M2, dsize=(int(crop_size), int(crop_size)))
+
+    if mode == "inference":
+        return img_warped, M2
+
     kp2d_h = torch.cat([kp2d, torch.ones_like(kp2d[..., :1])], dim=2)
     kp2d_warped = torch.bmm(M2, kp2d_h.transpose(1, 2)).transpose(1, 2)  # [B, N, 2]
 
