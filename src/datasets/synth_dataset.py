@@ -77,7 +77,9 @@ class SynDataset(Dataset):
 
 # Test dataset and augmentation
 if __name__ == "__main__":
-    body = False
+
+    body = True  # Set to True for body dataset, False for hand dataset
+
     if body:
         dataset = SynDataset(
             img_dir=Path("data/raw/synth_body"),
@@ -86,8 +88,8 @@ if __name__ == "__main__":
                 "crop_size": 256.0,
                 "roi": {
                     "angle": 25.0,
-                    "scale": [0.05, 0.10],
-                    "trans": 0.06,
+                    "scale": [-0.05, 0.15],
+                    "trans": 0.05,
                 },
                 "appearance": {
                     "probs": {
@@ -113,7 +115,7 @@ if __name__ == "__main__":
                 "crop_size": 128.0,
                 "roi": {
                     "angle": 15.0,
-                    "scale": [0.04, 0.08],
+                    "scale": [-0.05, 0.15],
                     "trans": 0.04,
                 },
                 "appearance": {

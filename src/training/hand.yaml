@@ -7,9 +7,9 @@ project: hand_dnn
 device: auto
 seed: 42
 epochs: 300               # 600 for body, 300 for hand
-batch_size: 128           # 256 
-accumulation_steps: 2     # simulates larger batch size
-val_batch_size: 128
+batch_size: 256           # 256 
+accumulation_steps: 1     # simulates larger batch size
+val_batch_size: 256
 lr: 0.0001                # 0.0001 
 weight_decay: 0.01
 scheduler_type: cosine    # cosine 
@@ -32,9 +32,9 @@ num_shape_params: 0      # 10 for body, 0 for hand
 # Augmentation
 aug:
   crop_size: 128.0        # 256.0 for body, 128.0 for hand
-  roi:                    # use smaller values for the hand
+  roi:
     angle: 15.0           
-    scale: [0.04, 0.08]
+    scale: [-0.05, 0.15]
     trans: 0.04
   appearance:
     probs: 
@@ -55,13 +55,13 @@ rot_weight: 1.0           # 1.0
 shape_weight: 0.0         # 1.0 for body, 0.0 for hand
 
 # Log settings 
-log_interval: 100 
-val_interval: 300
+log_interval: 50 
+val_interval: 150
 
 # Data parameters
 data_root: /cluster/project/hilliges/dsl_4/hand/synth_hand ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
 meta_file: /cluster/project/hilliges/dsl_4/hand/hand_meta.pkl ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
-val_ratio: 0.1
+val_ratio: 0.05
 test_ratio: 0.0
 num_workers: 4
 

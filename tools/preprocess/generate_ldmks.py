@@ -4,7 +4,7 @@ import joblib
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
-from utils import ldmks, extract_roi
+from utils import ldmks, roi
 
 def main():
 
@@ -44,23 +44,25 @@ def main():
                 ldmks_3d = ldmks.get_3d_landmarks(metadata, np.concatenate((body_indices, body_indices_roi)))
                 ldmks_2d = ldmks.project_3d_to_2d(ldmks_3d.squeeze(), camera_to_image, world_to_camera[:3])
 
-                body_meta[uid] = {"shape": shape, 
-                                  "pose": pose, 
-                                  "translation": translation, 
-                                  "roi": extract_roi.compute_roi(landmarks=ldmks_2d[-36:], margin=0.08), 
-                                  "ldmks_2d": ldmks_2d[:-36],}
+                body_meta[uid] = {
+                    "shape": shape,
+                    "pose": pose,
+                    "translation": translation,
+                    "roi": roi.compute_roi(landmarks=ldmks_2d[-36:], margin=0.08),
+                    "ldmks_2d": ldmks_2d[:-36],
+                }
                 body_ldmks_roi[uid] = ldmks_2d[-36:]
 
             else:
 
                 ldmks_3d = ldmks.get_3d_landmarks(metadata, hand_indices)
                 ldmks_2d = ldmks.project_3d_to_2d(ldmks_3d.squeeze(), camera_to_image, world_to_camera[:3])
-                
+
                 hand_meta[uid] = {
                     "shape": shape,
                     "pose": pose,
                     "translation": translation,
-                    "roi": extract_roi.compute_roi(landmarks=ldmks_2d, margin=0.05),
+                    "roi": roi.compute_roi(landmarks=ldmks_2d, margin=0.10),
                     "ldmks_2d": ldmks_2d,
                 }
 
