@@ -182,7 +182,7 @@ class DNNMultiTaskLoss(nn.Module):
         joint_loss = self.joint_loss(pred_joints, gt_joints)
 
         mse_loss = self.landmark_mse_loss(outputs["landmarks"][..., :2], targets["landmarks"])
-        mean_var = torch.exp(outputs["landmarks"][..., 2]).mean()
+        mean_std = torch.exp(0.5 * outputs["landmarks"][..., 2]).mean()
 
         # total_loss
         total_loss = (
@@ -193,15 +193,16 @@ class DNNMultiTaskLoss(nn.Module):
             + (self.weights["shape"] * shape_loss if body else 0.0)
         )
 
-        loss_dict =  {"total": total_loss,
+        loss_dict = {
+            "total": total_loss,
             "rotation": rot_loss,
             "translation": joint_loss,
             "landmark": landmark_loss,
             "pose": pose_loss,
             "landmark_mse": mse_loss,
-            "mean_var": mean_var
-            }
-        
+            "mean_std": mean_std,
+        }
+
         if body:
             loss_dict["shape"] = shape_loss
 

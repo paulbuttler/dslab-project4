@@ -36,7 +36,7 @@ class Trainer:
             "landmark": [],
             "pose": [],
             "landmark_mse": [],
-            "mean_var": [],
+            "mean_std": [],
         }
         self.val_history = {
             "total": [],
@@ -45,7 +45,7 @@ class Trainer:
             "landmark": [],
             "pose": [],
             "landmark_mse": [],
-            "mean_var": [],
+            "mean_std": [],
         }
         if self.body:
             self.train_history["shape"] = []
@@ -218,7 +218,7 @@ class Trainer:
             "translation": 0,
             "rotation": 0,
             "landmark_mse": 0,
-            "mean_var": 0,
+            "mean_std": 0,
         }
         if self.body:
             running_loss["shape"] = 0
@@ -257,15 +257,15 @@ class Trainer:
 
                 if self.wandb_logger:
                     log_data = {
-                            "train/total_loss": last_loss["total"],
-                            "train/landmark_loss": last_loss["landmark"],
-                            "train/pose_loss": last_loss["pose"],
-                            "train/translation_loss": last_loss["translation"],
-                            "train/rotation_loss": last_loss["rotation"],
-                            "train/landmark_mse_loss": last_loss["landmark_mse"],
-                            "train/landmark_mean_var": last_loss["mean_var"],
-                            "step": (epoch - 1) * len(self.train_loader) + batch_idx + 1,
-                        }
+                        "train/total_loss": last_loss["total"],
+                        "train/landmark_loss": last_loss["landmark"],
+                        "train/pose_loss": last_loss["pose"],
+                        "train/translation_loss": last_loss["translation"],
+                        "train/rotation_loss": last_loss["rotation"],
+                        "train/landmark_mse_loss": last_loss["landmark_mse"],
+                        "train/landmark_mean_std": last_loss["mean_std"],
+                        "step": (epoch - 1) * len(self.train_loader) + batch_idx + 1,
+                    }
                     if self.body:
                         log_data["train/shape_loss"] = last_loss["shape"]
                     self.wandb_logger.log_metrics(log_data)
@@ -276,7 +276,7 @@ class Trainer:
                 self.train_history["translation"].append(last_loss["translation"])
                 self.train_history["rotation"].append(last_loss["rotation"])
                 self.train_history["landmark_mse"].append(last_loss["landmark_mse"])
-                self.train_history["mean_var"].append(last_loss["mean_var"])
+                self.train_history["mean_std"].append(last_loss["mean_std"])
 
                 # reset running loss
                 running_loss = {
@@ -286,7 +286,7 @@ class Trainer:
                     "translation": 0,
                     "rotation": 0,
                     "landmark_mse": 0,
-                    "mean_var": 0,
+                    "mean_std": 0,
                 }
                 if self.body:
                     self.train_history["shape"].append(last_loss["shape"])
@@ -297,18 +297,18 @@ class Trainer:
                 val_loss = self._validate()
                 if self.wandb_logger:
                     log_data = {
-                            "val/total_loss": val_loss["total"],
-                            "val/landmark_loss": val_loss["landmark"],
-                            "val/pose_loss": val_loss["pose"],
-                            "val/translation_loss": val_loss["translation"],
-                            "val/rotation_loss": val_loss["rotation"],
-                            "val/landmark_mse_loss": val_loss["landmark_mse"],
-                            "val/landmark_mean_var": val_loss["mean_var"],
-                            "step": (epoch - 1) * len(self.train_loader) + batch_idx + 1,
-                        }
+                        "val/total_loss": val_loss["total"],
+                        "val/landmark_loss": val_loss["landmark"],
+                        "val/pose_loss": val_loss["pose"],
+                        "val/translation_loss": val_loss["translation"],
+                        "val/rotation_loss": val_loss["rotation"],
+                        "val/landmark_mse_loss": val_loss["landmark_mse"],
+                        "val/landmark_mean_std": val_loss["mean_std"],
+                        "step": (epoch - 1) * len(self.train_loader) + batch_idx + 1,
+                    }
                     if self.body: 
                         log_data["val/shape_loss"] = val_loss["shape"]
-                        
+
                     self.wandb_logger.log_metrics(log_data)
 
                 self.val_history["total"].append(val_loss["total"])
@@ -317,7 +317,7 @@ class Trainer:
                 self.val_history["translation"].append(val_loss["translation"])
                 self.val_history["rotation"].append(val_loss["rotation"])
                 self.val_history["landmark_mse"].append(val_loss["landmark_mse"])
-                self.val_history["mean_var"].append(val_loss["mean_var"])
+                self.val_history["mean_std"].append(val_loss["mean_std"])
 
                 if self.body: 
                     self.val_history["shape"].append(val_loss["shape"]) 
@@ -342,7 +342,7 @@ class Trainer:
             "translation": 0,
             "rotation": 0,
             "landmark_mse": 0,
-            "mean_var": 0,
+            "mean_std": 0,
         }
         if self.body:
             val_loss["shape"] = 0
@@ -419,7 +419,7 @@ class Trainer:
             "translation": 0,
             "rotation": 0,
             "landmark_mse": 0,
-            "mean_var": 0,
+            "mean_std": 0,
         }
         if self.body:
             test_loss["shape"] = 0
@@ -445,8 +445,19 @@ class Trainer:
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--hand", action="store_true", default=False)
+    args = parser.parse_args()
+
+    if args.hand:
+        print("Hand model training")
+    else:
+        print("Body model training")
+
     # Load configuration
-    config_manager = ConfigManager()
+    config_manager = ConfigManager("./training/hand.yaml" if args.hand else "./training/body.yaml")
     config = config_manager.get_config()
 
     # Create save directory

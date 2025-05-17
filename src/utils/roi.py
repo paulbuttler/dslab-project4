@@ -3,10 +3,36 @@ import joblib
 import numpy as np
 import cv2
 from pathlib import Path
+import torch
 
 
 def compute_roi(landmarks, image=None, margin=0.08, input_size=512):
-    """Crop a square ROI that tightly contains all landmarks."""
+    """
+    Compute a square ROI containing all landmarks, with optional margin.
+    Handles both single numpy array and batched torch tensor inputs.
+    """
+
+    # PyTorch batched case: (B, N, 2)
+    if isinstance(landmarks, torch.Tensor) and landmarks.ndim == 3:
+        x_min = landmarks[..., 0].min(dim=1).values
+        y_min = landmarks[..., 1].min(dim=1).values
+        x_max = landmarks[..., 0].max(dim=1).values
+        y_max = landmarks[..., 1].max(dim=1).values
+
+        center_x = (x_min + x_max) / 2
+        center_y = (y_min + y_max) / 2
+        box_size = (x_max - x_min).maximum(y_max - y_min) * (1.0 + margin)
+        box_size = box_size.minimum(landmarks.new_tensor(input_size))
+
+        x_min = (center_x - box_size / 2).floor().to(torch.int32)
+        y_min = (center_y - box_size / 2).floor().to(torch.int32)
+        x_max = (center_x + box_size / 2).ceil().to(torch.int32)
+        y_max = (center_y + box_size / 2).ceil().to(torch.int32)
+
+        rois = torch.stack([x_min, y_min, x_max, y_max], dim=1)
+        return rois
+    
+    # NumPy single sample: (N, 2)
     x_min, y_min = np.min(landmarks, axis=0)
     x_max, y_max = np.max(landmarks, axis=0)
 
@@ -61,7 +87,7 @@ if __name__ == "__main__":
     else:
         hand_meta = joblib.load("data/annotations/hand_meta.pkl")
         landmarks = hand_meta[uid]["ldmks_2d"]
-        margin = 0.05
+        margin = 0.10
 
     img = cv2.imread(str(img_file))
     _ = compute_roi(landmarks, img, margin, img.shape[-2])
