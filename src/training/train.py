@@ -111,7 +111,7 @@ class Trainer:
             metadata=meta,
             aug=config.aug,
             indices=val_indices,
-            mode="test",
+            mode="val",
             device=self.config.device,
         )
         if test_size > 0:
@@ -121,7 +121,7 @@ class Trainer:
                 metadata=meta,
                 aug=config.aug,
                 indices=test_indices,
-                mode="test",
+                mode="val",
                 device=self.config.device,
             )
 
