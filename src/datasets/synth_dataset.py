@@ -15,10 +15,10 @@ class SynDataset(Dataset):
 
         self.device = device
         self.img_dir = img_dir
-        self.train = mode == "train"
+        self.mode = mode
         self.crop_size = aug["crop_size"]
 
-        if self.train:
+        if self.mode == "train":
             self.roi_aug = aug["roi"]
             self.appearance_aug = AppearanceAugmentation(aug["appearance"]).to(device)
 
@@ -53,17 +53,22 @@ class SynDataset(Dataset):
         kp2d = torch.from_numpy(kp2d).to(self.device, dtype=torch.float32).unsqueeze(0)
         roi = torch.from_numpy(roi).to(self.device, dtype=torch.float32).unsqueeze(0)
 
-        if self.train:
+        if self.mode == "train":
+            # ROI perturbation and appearance augmentation
             img, kp2d = random_roi_transform(img, kp2d, roi, self.roi_aug, self.crop_size)
             img = self.appearance_aug(img)
-        else:
-            img, kp2d = apply_roi_transform(img, kp2d, roi, "test", self.crop_size)
+        elif self.mode == "val":
+            # Crop using the provided ROI
+            img, kp2d = apply_roi_transform(img, kp2d, roi, "val", self.crop_size)
+        elif self.mode == "test":
+            # Return the original image and keypoints
+            img, kp2d = img, kp2d
 
         # Normalize with ImageNet stats
         img = self.normalize(img)
 
         # Normalize 2D landmark coordinates to [0, 1]
-        kp2d = kp2d / img.shape[-1]
+        kp2d = kp2d / img.shape[-1] if self.mode != "test" else kp2d
 
         target = {
             "landmarks": kp2d.squeeze(0).cpu(),
@@ -71,6 +76,8 @@ class SynDataset(Dataset):
             "shape": torch.from_numpy(shape).float(),
             "translation": torch.from_numpy(translation).float(),
         }
+        if self.mode == "test":
+            target["roi"] = roi.squeeze(0).cpu()
 
         return img.squeeze(0).cpu(), target, uid
 

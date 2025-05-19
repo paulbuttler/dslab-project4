@@ -87,7 +87,7 @@ def get_full_shape_and_pose(pred_shape, pred_pose, gt_shape, gt_pose):
     return full_shape, full_pose
 
 
-def get_val_dataloader(config, data_root, meta_file, batch_size=16):
+def get_val_dataloader(config, data_root, meta_file, batch_size=16, mode="val"):
     """
     Initialize validation dataloader that was used for training.
     """
@@ -107,7 +107,7 @@ def get_val_dataloader(config, data_root, meta_file, batch_size=16):
         metadata=meta_file,
         aug=config.aug,
         indices=val_indices,
-        mode="test",
+        mode=mode,
         device=config.device,
     )
 
