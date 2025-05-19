@@ -120,13 +120,30 @@ def apply_roi_transform(
     # Warp image and keypoints
     img_warped = warp_affine(img, M2, dsize=(int(crop_size), int(crop_size)))
 
-    if mode == "inference":
+    if mode == "test":
         return img_warped, M2
 
     kp2d_h = torch.cat([kp2d, torch.ones_like(kp2d[..., :1])], dim=2)
     kp2d_warped = torch.bmm(M2, kp2d_h.transpose(1, 2)).transpose(1, 2)  # [B, N, 2]
 
+    # assert torch.allclose(warp_back(kp2d_warped, M2), kp2d.cpu(), atol=1e-4)
     return img_warped, kp2d_warped
+
+
+def warp_back(kp2d, M):
+    """
+    Given a set of 2D keypoints and an affine transformation matrix,
+    compute the original 2D keypoints before the transformation.
+    """
+    B, N, _ = kp2d.shape
+    ldmks_crop_h = torch.cat([kp2d, torch.ones_like(kp2d[..., :1])], dim=-1)  # [B, N, 3]
+    eye_row = torch.tensor([0.0, 0.0, 1.0], device=M.device).view(1, 1, 3).expand(B, 1, 3)
+    M_h = torch.cat([M, eye_row], dim=1)  # [B, 3, 3]
+
+    # We want to solve for Y: (M_h @ Y^T = X^T), so Y^T = torch.linalg.solve(M_h, X^T)
+    ldmks_orig_h_t = torch.linalg.solve(M_h, ldmks_crop_h.transpose(1, 2))  # [B, 3, N]
+    ldmks_orig_h = ldmks_orig_h_t.transpose(1, 2)  # [B, N, 3]
+    return ldmks_orig_h[..., :2].cpu()
 
 
 class AppearanceAugmentation(nn.Module):

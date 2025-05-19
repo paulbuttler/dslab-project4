@@ -12,9 +12,9 @@ from aitviewer.renderables.smpl import SMPLSequence  # type: ignore
 from aitviewer.renderables.billboard import Billboard  # type: ignore
 from aitviewer.scene.camera import OpenCVCamera  # type: ignore
 from aitviewer.viewer import Viewer  # type: ignore
-from utils.rottrans import aa2rot, rot2aa, rotation_6d_to_matrix
-from utils.roi import compute_roi
-from datasets.transforms import apply_roi_transform, normalize, denormalize
+from utils.rottrans import aa2rot, rot2aa
+from datasets.transforms import denormalize
+from utils.initialization import initial_pose_estimation
 
 
 def visualize_landmarks(
@@ -114,9 +114,7 @@ def test_smpl_layer(pose_rot, pose_aa, shape, translation, gt_joints=None, part=
     )
 
     smpl_layer = SMPLLayer(model_type="smplh", gender="neutral", num_betas=16)
-
     B = pose_rot.shape[0]
-
     smpl_output = smplh_layer(
         betas=shape,
         global_orient=pose_rot[:, 0],
@@ -128,7 +126,6 @@ def test_smpl_layer(pose_rot, pose_aa, shape, translation, gt_joints=None, part=
         return_full_pose=False,
     )
     smplh_joints = smpl_output.joints
-
     vertices, joints = smpl_layer.fk(
         betas=shape.reshape(B, -1),
         poses_root=pose_aa[:, 0].reshape(B, -1),
@@ -146,15 +143,11 @@ def test_smpl_layer(pose_rot, pose_aa, shape, translation, gt_joints=None, part=
     if gt_joints is not None:
         if part == "body" or part == "full":
             diff = np.linalg.norm(gt_joints - smplh_joints[0, :52], axis=1)
-            print(
-                f"Mean distance of 3d ground-truth body joints used for training to actual gt-joints: {diff[:22].mean()}"
-            )
-            print(
-                f"Mean distance of 3d ground-truth hand joints used for training to actual gt-joints: {diff[22:].mean()}"
-            )
+            print(f"Mean distance of 3d gt body joints used for training to actual gt-joints: {diff[:22].mean()}")
+            print(f"Mean distance of 3d gt hand joints used for training to actual gt-joints: {diff[22:].mean()}")
         elif part == "hand":
             diff = np.linalg.norm(gt_joints[:15] - smplh_joints[0, 22:37], axis=1)
-            print(f"Mean distance of 3d ground-truth hand joints used for training to actual gt-joints: {diff.mean()}")
+            print(f"Mean distance of 3d gt hand joints used for training to actual gt-joints: {diff.mean()}")
 
 
 def visualize_pose_and_shape(
@@ -168,7 +161,7 @@ def visualize_pose_and_shape(
     data_root="data/raw/synth_body",
 ):
 
-    print(f"\nVisualizing {part} pose" + "and shape" * (part == "body" or part == "full"))
+    print(f"\nVisualizing {part} pose" + " and shape" * (part != "hand"))
     smpl_layer = SMPLLayer(model_type="smplh", gender="neutral", num_betas=full_shape.shape[1])
     # gt_pose_rot = aa2rot(gt_pose)
 
@@ -230,87 +223,6 @@ def visualize_pose_and_shape(
         v.run()
 
 
-def visualize_batch_of_images(images):
-    from torchvision.utils import make_grid
-
-    grid = make_grid(images, nrow=5, padding=2)  # [C, H', W']
-    grid_np = grid.permute(1, 2, 0).cpu().numpy()  # [H', W', C]
-    grid_bgr = cv2.cvtColor(grid_np, cv2.COLOR_RGB2BGR)
-    cv2.imshow("Batch Grid", grid_bgr)
-    cv2.waitKey(0)
-
-
-def initial_pose_estimation(images, body_model, hand_model, device):
-    """
-    Perform initial pose, shape and refined landmark estimation using trained body and hand models.
-    """
-
-    normalized_images = normalize(images)
-
-    body_model.eval()
-    with torch.no_grad():
-        outputs = body_model(normalized_images)
-        ldmks = (outputs["landmarks"][..., :2] * 256.0).cpu()
-        std = (torch.exp(0.5 * outputs["landmarks"][..., 2])).cpu()
-        body_pose = rotation_6d_to_matrix(outputs["pose"]).cpu()
-        shape = outputs["shape"].cpu()
-
-    left_hand_ldmks = ldmks[:, 665:802]
-    right_hand_ldmks = ldmks[:, 802:939]
-
-    left_hand_roi = compute_roi(left_hand_ldmks, None, 0.15, images.shape[-2]).to(device, dtype=torch.float32)
-    right_hand_roi = compute_roi(right_hand_ldmks, None, 0.15, images.shape[-2]).to(device, dtype=torch.float32)
-
-    left_hand_img, M1 = apply_roi_transform(images, None, left_hand_roi, "inference", 128.0)
-    right_hand_img, M2 = apply_roi_transform(images, None, right_hand_roi, "inference", 128.0)
-
-    # visualize_batch_of_images(left_hand_img)
-    # visualize_batch_of_images(torch.flip(right_hand_img, [-1]))
-
-    left_hand_img = normalize(left_hand_img)
-    right_hand_flipped = normalize(torch.flip(right_hand_img, [-1]))
-
-    hand_model.eval()
-    with torch.no_grad():
-        left_out = hand_model(left_hand_img)
-        right_out = hand_model(right_hand_flipped)
-
-        left_hand_ldmks_crop = left_out["landmarks"][..., :2] * 128.0
-        left_hand_std = (torch.exp(0.5 * left_out["landmarks"][..., 2])).cpu()
-        left_hand_pose = rotation_6d_to_matrix(left_out["pose"]).cpu()
-
-        right_hand_ldmks_crop = right_out["landmarks"][..., :2] * 128.0
-        right_hand_std = (torch.exp(0.5 * right_out["landmarks"][..., 2])).cpu()
-        right_hand_pose_flipped = rotation_6d_to_matrix(right_out["pose"]).cpu()
-
-        # Flip landmarks and pose
-        right_hand_ldmks_crop[..., 0] = 128.0 - right_hand_ldmks_crop[..., 0]
-
-    def warp_back(ldmks_crop, M):
-        B, N, _ = ldmks_crop.shape
-        ldmks_crop_h = torch.cat([ldmks_crop, torch.ones_like(ldmks_crop[..., :1])], dim=-1)  # [B, N, 3]
-        M_h = torch.cat([M, torch.tensor([0.0, 0.0, 1.0], device=M.device).view(1, 1, 3).expand(B, -1, -1)], dim=1)
-        M_inv = torch.inverse(M_h)  # [B, 3, 3]
-        ldmks_orig = torch.bmm(ldmks_crop_h, M_inv.transpose(1, 2))  # [B, N, 3]
-        return ldmks_orig[..., :2].cpu()
-
-    left_hand_ldmks_orig = warp_back(left_hand_ldmks_crop, M1)
-    right_hand_ldmks_orig = warp_back(right_hand_ldmks_crop, M2)
-
-    # Replace the original hand landmarks with the refined ones
-    ldmks[:, 665:802] = left_hand_ldmks_orig
-    ldmks[:, 802:939] = right_hand_ldmks_orig
-    std[:, 665:802] = left_hand_std
-    std[:, 802:939] = right_hand_std
-
-    # Concatenate pose parameters and flip the right hand pose
-    pose = torch.cat([body_pose, left_hand_pose, right_hand_pose_flipped], dim=1)
-    pose = rot2aa(pose)
-    pose[:, -15:] *= torch.tensor([1.0, -1.0, -1.0], device=pose.device)
-
-    return ldmks, std, pose, shape
-
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -353,21 +265,23 @@ if __name__ == "__main__":
 
         body_model, config = load_model("body")
         hand_model, _ = load_model("hand")
-        val_loader = get_val_dataloader(config, data_root, meta_file, 15)
+
+        val_loader = get_val_dataloader(config, data_root, meta_file, 15, "test")
 
         images, targets, uids = next(iter(val_loader))
+        roi = targets["roi"].to(config.device)
+
         images = images.to(config.device)
         images = denormalize(images)
-
         # Perform pose, shape and refined landmark estimation
-        ldmks, std, pose, shape = initial_pose_estimation(images, body_model, hand_model, config.device)
+        ldmks, std, pose, shape = initial_pose_estimation(images, roi, body_model, hand_model, config.device)
 
         # Concatenate global orientation
         gt_pose = targets["pose"]
         full_pose = torch.cat([gt_pose[:, 0].unsqueeze(1), pose], dim=1)
 
         # Visualize landmarks, pose and shape
-        visualize_landmarks(images, ldmks, None, None, n=ldmks.shape[1], save_dir=f"experiments/synth_data/{part}")
+        visualize_landmarks(images, ldmks, None, None, ldmks.shape[1], save_dir=f"experiments/synth_data/{part}")
         visualize_pose_and_shape(
             uids, targets["pose"], targets["shape"], full_pose, shape, targets["translation"], part, data_root
         )
