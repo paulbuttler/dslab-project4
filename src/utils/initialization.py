@@ -46,8 +46,8 @@ def initial_pose_estimation(images, roi, body_model, hand_model, device):
     right_hand_img, M2 = apply_roi_transform(images, None, right_hand_roi, "test", 128.0)
     right_hand_img_flipped = torch.flip(right_hand_img, [-1])
 
-    visualize_batch_of_images(left_hand_img)
-    visualize_batch_of_images(right_hand_img_flipped)
+    # visualize_batch_of_images(left_hand_img)
+    # visualize_batch_of_images(right_hand_img_flipped)
 
     left_hand_img = normalize(left_hand_img)
     right_hand_flipped = normalize(right_hand_img_flipped)
@@ -88,7 +88,6 @@ def initial_pose_estimation(images, roi, body_model, hand_model, device):
     pose = torch.cat([body_pose, left_hand_pose, right_hand_pose_flipped], dim=1)
     pose = rot2aa(pose)
     pose[:, -15:] *= torch.tensor([1.0, -1.0, -1.0], device=pose.device)
-
     return ldmks, std, pose, shape
 
 def visualize_batch_of_images(images):
