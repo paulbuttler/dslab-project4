@@ -5,7 +5,8 @@ from models.smplx.body_models import SMPL
 from aitviewer.renderables.smpl import SMPLSequence
 from scipy.spatial.transform import Rotation as R
 from utils.rottrans import rot2aa, rotation_6d_to_matrix 
-
+from aitviewer.models.smpl import SMPLLayer
+from aitviewer.renderables.smpl import SMPLSequence
 
 def compute_pve_neutral_pose_scale_corrected(smpl_layer, predicted_smpl_shape, target_smpl_shape):
     """
@@ -99,6 +100,78 @@ def get_mesh_vertices(smpl_layer, pred_shape, pred_pose):
     fk = smpl_seq.fk()[0]
 
     return torch.tensor(fk).view(-1, 3)
+
+def get_similarity(smpl_layer, pred_shape, gt_shape, pred_pose, gt_pose, measure_type='body', num_joints=22):
+    """
+    Get similarity transform between predicted and ground truth SMPL meshes.
+    :param pred_shape: predicted SMPL shape parameters
+    :param gt_shape: ground truth SMPL shape parameters
+    :param pred_pose: predicted SMPL pose parameters
+    :param gt_pose: ground truth SMPL pose parameters
+    :return: loss values (MPVPE, PA-MPVPE, PA-MPJPE, PA params)
+    """
+    pred_full_pose = torch.cat([gt_pose[:, 0].unsqueeze(1), pred_pose], dim=1)
+    
+    # 0: root 
+    # 1:22 (21): body, 
+    # 22:37 (15): left hand, 
+    # 37:52 (15): right hand
+    required_pose_len = 52  # 1 root + 21 body + 15 left hand + 15 right hand
+    if pred_full_pose.shape[1] < required_pose_len:
+        pad_len = required_pose_len - pred_full_pose.shape[1]
+        pred_full_pose = torch.cat([pred_full_pose, torch.zeros(pred_full_pose.shape[0], pad_len, device=pred_full_pose.device)], dim=1)
+    if gt_pose.shape[1] < required_pose_len:
+        pad_len = required_pose_len - gt_pose.shape[1]
+        gt_pose = torch.cat([gt_pose, torch.zeros(gt_pose.shape[0], pad_len, device=gt_pose.device)], dim=1)
+
+
+    #if(gt_shape.shape[1] == 10):
+     #   pred_full_shape = pred_shape
+    #else:
+        #pred_full_shape = torch.cat(
+         #   [
+        #        pred_shape,
+       #         gt_shape[:, -6:],
+      #      ],
+     #       dim=1,
+    #    )
+
+    
+    pred_smpl_seq = SMPLSequence(
+        smpl_layer=smpl_layer,
+        poses_root=pred_full_pose[:, 0].reshape(1, -1),
+        poses_body=pred_full_pose[:, 1:22].reshape(1, -1),
+        poses_left_hand=pred_full_pose[:, 22:37].reshape(1, -1),
+        poses_right_hand=pred_full_pose[:, 37:].reshape(1, -1),
+        betas=pred_shape,
+    )
+    pred_fk = pred_smpl_seq.fk()
+
+    gt_smpl_seq = SMPLSequence(
+        smpl_layer=smpl_layer,
+        poses_root=gt_pose[:, 0].reshape(1, -1),
+        poses_body=gt_pose[:, 1:22].reshape(1, -1),
+        poses_left_hand=gt_pose[:, 22:37].reshape(1, -1),
+        poses_right_hand=gt_pose[:, 37:].reshape(1, -1),
+        betas=gt_shape,
+    )
+    gt_fk = gt_smpl_seq.fk()
+    print(pred_fk[1].shape, gt_fk[1].shape, pred_fk[0].shape, gt_fk[0].shape)
+    pred_hat, vertex_hat, params = compute_similarity_transform(
+        pred_fk[1].squeeze(),
+        gt_fk[1].squeeze(),
+        num_joints=num_joints,
+        verts=gt_fk[0].squeeze(),
+    )
+
+    MPVPE = np.mean(np.linalg.norm(pred_fk[0] - gt_fk[0], axis=-1)) * 1000 # in mm
+    PA_MPVPE = np.mean(np.linalg.norm(vertex_hat - gt_fk[0], axis=-1)) * 1000 # in mm
+    PA_MPJPE = np.mean(np.linalg.norm(pred_hat - gt_fk[1], axis=-1)) * 1000 # in mm
+    return MPVPE, PA_MPVPE, PA_MPJPE, params
+
+
+
+
 
 def compute_similarity_transform(S1, S2, num_joints, verts=None):
     """

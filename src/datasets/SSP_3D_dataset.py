@@ -38,7 +38,7 @@ class SSP_3D_Dataset(Dataset):
         self.bbox_centres = data['bbox_centres']
         self.bbox_whs = data['bbox_whs']
         self.joints_2d = data['joints2D']
-        
+        self.gender = data['genders']
         self.cam_trans = data['cam_trans']
 
         self.device = device
@@ -57,6 +57,8 @@ class SSP_3D_Dataset(Dataset):
 
         shape_params = torch.from_numpy(self.body_shapes[index]).to(device=self.device, dtype=torch.float32)
         pose_param = torch.from_numpy(self.body_poses[index]).to(device=self.device, dtype=torch.float32)
+        pose_param = pose_param[:-6]
+        print("#######",  pose_param.shape)
 
         # Calculate the four corners of the bounding box (roi)
         cx, cy = self.bbox_centres[index]
@@ -73,17 +75,25 @@ class SSP_3D_Dataset(Dataset):
 
         # Convert pose
         cam_trans = self.cam_trans[index]
-        root_pose = pose_param[0:3]
+        # Create a 4x4 transformation matrix with identity rotation and cam_trans as translation
+        transformation_matrix = torch.eye(4, dtype=torch.float32, device=self.device)
+        transformation_matrix[:3, 3] = torch.from_numpy(cam_trans).to(self.device, dtype=torch.float32)
+
+        root_pose = torch.zeros(3, device=self.device)# pose_param[0:3]
+        print("------------------------", transformation_matrix)
         
 
+        #pose = torch.cat([root_pose, pose_param[3:], torch.zeros(52*3 - pose_param.numel(), device=self.device)])
         pose = torch.cat([root_pose, pose_param[3:], torch.zeros(52*3 - pose_param.numel(), device=self.device)])
         pose = pose.view(-1, 3)
+        print("£££££££££££££££££££££££££", self.gender[index])
         target = {
             'pose': pose.to(device=self.device),
             'shape': shape_params.to(device=self.device),
             
             "landmarks": joints_2d.to(device=self.device),
             "translation": (0,0,0),
+            "transform_matrix": transformation_matrix,
         }
 
         print(img_path)
