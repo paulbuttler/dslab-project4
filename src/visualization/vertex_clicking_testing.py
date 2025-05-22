@@ -121,14 +121,12 @@ if __name__ == "__main__":
         labels_dir="data/SSP_3D",
         device=device
     )
-    # dataset = EHF_Dataset(
-    #     img_dir=Path("data/EHF"),
-    #     device=device,
-    # )
+    dataset = EHF_Dataset(
+        data_dir=Path("data/EHF"),
+        device=device,
+    )
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     ter = iter(dataloader)
-    batch = next(ter)
-    batch = next(ter)
     batch = next(ter)
 
 
@@ -142,10 +140,10 @@ if __name__ == "__main__":
     images, roi, targets, uids = batch
     gt_pose = targets["pose"]
     ldmks, std, pred_pose, pred_shape = initial_pose_estimation(images, roi, body_model, hand_model, device)
-    # full_pose = torch.cat([gt_pose[:, 0].unsqueeze(1).to(device), pred_pose.to(device)], dim=1)
-    full_pose = gt_pose
+    full_pose = torch.cat([gt_pose[:, 0].unsqueeze(1).to(device), pred_pose.to(device)], dim=1)
+    #full_pose = gt_pose
     smpl_layer = SMPLLayer(model_type="smplh", gender="neutral", num_betas=10)
-    
+    print("!!!!!!!!!!!!!!!!!!", full_pose[:, 0])
     smpl_seq = SMPLSequence(
         smpl_layer=smpl_layer,
         poses_root=full_pose[:, 0].reshape(1, -1),
@@ -166,23 +164,20 @@ if __name__ == "__main__":
     # np.save(v.file_path, vertex_indices)
 
     # Display generated vertices for the SMPL-H model.
-    for i in ["body", "hand", "head", "body36"]:
-        # Load the vertex indices from files.
-        vertex_indices = np.int64(
-            np.load(f"src/visualization/vertices/{i}_vertices.npy")
-        )
-        # Extract the positions of the specified vertices and display them.
-        vertex_positions = (
-            smpl_seq.vertices[:, vertex_indices] + smpl_seq.position[np.newaxis]
-        )
-        print(f"Number of {i} vertices:", vertex_positions.shape[1])
-        vertices = Spheres(
-            vertex_positions,
-            name=f"{i}_Vertices",
-            radius=0.004,
-            color=(0.0, 0.0, 1.0, 1.0),
-        )
-        v.scene.add(vertices)
+    '''vertex_positions = np.int64(
+        targets['joints2D']
+    )
+    # Extract the positions of the specified vertices and display them.
+    
+    print(smpl_seq.position[np.newaxis].shape)
+    vertex_positions = vertex_positions.reshape(-1, 3)
+    vertices = Spheres(
+        vertex_positions,
+        name=f"Vertices",
+        radius=0.004,
+        color=(0.0, 0.0, 1.0, 1.0),
+    )'''
+    #v.scene.add(vertices)
 
     # Display in viewer.
     v.scene.add(smpl_seq)
@@ -190,8 +185,5 @@ if __name__ == "__main__":
     v.scene.origin.enabled = False
     v.shadows_enabled = False
 
-    try:
-        v.run()
-    finally:
-        # Ensure clicked vertices are saved when the viewer is closed.
-        v.save_clicked_vertices()
+    v.run()
+    

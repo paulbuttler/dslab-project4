@@ -46,7 +46,7 @@ def initial_pose_estimation(images, roi, body_model, hand_model, device):
     right_hand_img, M2 = apply_roi_transform(images, None, right_hand_roi, "test", 128.0)
     right_hand_img_flipped = torch.flip(right_hand_img, [-1])
 
-    # visualize_batch_of_images(left_hand_img)
+    #visualize_batch_of_images(cropped_images)
     # visualize_batch_of_images(right_hand_img_flipped)
 
     left_hand_img = normalize(left_hand_img)
