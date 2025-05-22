@@ -13,7 +13,7 @@ from utils.rottrans import rot2aa
 from torchvision.io import decode_image
 from torch.utils.data import Dataset, DataLoader
 from aitviewer.models.smpl import SMPLLayer  # type: ignore
-from utils.evaluation import get_similarity
+from utils.evaluation import get_similarity_body, get_similarity_hands
 from torchvision.transforms import functional as F
 from scipy.spatial import procrustes
 from models.load import load_model
@@ -123,19 +123,23 @@ if __name__ == "__main__":
     MPVPE_ls = []
     PA_MPVPE_ls = []
     PA_MPJPE_ls = []
+    PA_MPJPE_hand_ls = []
     for i, batch in enumerate(dataloader):
         images, roi, targets, uids = batch
         print("REACHED", device)
         ldmks, std, pred_pose, pred_shape = initial_pose_estimation(images, roi, body_model, hand_model, device)
-        MPVPE, PA_MPVPE, PA_MPJPE, params = get_similarity(smpl_layer, pred_shape, targets['shape'], pred_pose, targets['pose'], measure_type="body", num_joints=22)
+        MPVPE, PA_MPVPE, PA_MPJPE, params = get_similarity_body(smpl_layer, pred_shape, targets['shape'], pred_pose, targets['pose'])
+        # PA_MPJPE_hand = get_similarity_hands(smpl_layer, pred_shape, targets['shape'], pred_pose, targets['pose'])
         #print("MPVPE", MPVPE)
         #print("PA_MPVPE", PA_MPVPE)
         #print("PA_MPJPE", PA_MPJPE)
         MPVPE_ls.append(MPVPE)
         PA_MPVPE_ls.append(PA_MPVPE)
         PA_MPJPE_ls.append(PA_MPJPE)
+        # PA_MPJPE_hand_ls.append(PA_MPJPE_hand)
+
     print("MPVPE", np.mean(MPVPE_ls))
     print("PA_MPVPE", np.mean(PA_MPVPE_ls))
     print("PA_MPJPE", np.mean(PA_MPJPE_ls))
-        
+    print("PA_MPJPE_hand", np.mean(PA_MPJPE_hand_ls))
 

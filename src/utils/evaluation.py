@@ -94,14 +94,55 @@ def get_obj_file_vertices(file_path):
 #     axis_angles = np.stack(axis_angles, axis=1)  # shape (3, n)
 #     return axis_angles.reshape(-1,3)
 
-def get_mesh_vertices(smpl_layer, pred_shape, pred_pose):
-    poses = pred_pose[:, 0:21].contiguous().view(1, smpl_layer.bm.NUM_BODY_JOINTS * 3).cpu().numpy()
-    smpl_seq = SMPLSequence(poses, smpl_layer, betas=pred_shape)
-    fk = smpl_seq.fk()[0]
+def get_similarity_hands(smpl_layer, pred_shape, gt_shape, pred_pose, gt_pose):
+    """
+    Get similarity transform between predicted and ground truth SMPL hand meshes.
+    :param pred_shape: predicted SMPL shape parameters
+    :param gt_shape: ground truth SMPL shape parameters
+    :param pred_pose: predicted SMPL pose parameters
+    :param gt_pose: ground truth SMPL pose parameters
+    :return: loss values (PA-MPJPE, PA params)
+    """
+    
+    min_joint = 22
+    max_joint = 52
+    pred_full_pose = torch.cat([gt_pose[:, 0].unsqueeze(1), pred_pose], dim=1)
 
-    return torch.tensor(fk).view(-1, 3)
+    pred_smpl_seq = SMPLSequence(
+        smpl_layer=smpl_layer,
+        #poses_root=pred_full_pose[:, 0].reshape(1, -1),
+        poses_body=gt_pose[:, 1:22].reshape(1, -1),
+        poses_left_hand=pred_full_pose[:, 22:37].reshape(1, -1),
+        poses_right_hand=pred_full_pose[:, 37:].reshape(1, -1),
+        betas=pred_shape,
+    )
+    pred_fk = pred_smpl_seq.fk()
 
-def get_similarity(smpl_layer, pred_shape, gt_shape, pred_pose, gt_pose, measure_type='body', num_joints=22):
+    gt_smpl_seq = SMPLSequence(
+        smpl_layer=smpl_layer,
+        #poses_root=gt_pose[:, 0].reshape(1, -1),
+        poses_body=gt_pose[:, 1:22].reshape(1, -1),
+        poses_left_hand=gt_pose[:, 22:37].reshape(1, -1),
+        poses_right_hand=gt_pose[:, 37:].reshape(1, -1),
+        betas=gt_shape,
+    )
+    gt_fk = gt_smpl_seq.fk()
+
+
+
+    pred_hat, params = compute_similarity_transform(
+        pred_fk[1].squeeze(),
+        gt_fk[1].squeeze(),
+        test_type='hands',
+    )
+    print(pred_hat.shape, gt_fk[1].shape)
+    pred_hat = pred_hat[:, min_joint:max_joint]
+    PA_MPJPE = np.mean(np.linalg.norm(pred_hat - gt_fk[1][:, min_joint:max_joint], axis=-1)) * 1000 # in mm
+    return PA_MPJPE, params
+
+
+
+def get_similarity_body(smpl_layer, pred_shape, gt_shape, pred_pose, gt_pose):
     """
     Get similarity transform between predicted and ground truth SMPL meshes.
     :param pred_shape: predicted SMPL shape parameters
@@ -110,6 +151,7 @@ def get_similarity(smpl_layer, pred_shape, gt_shape, pred_pose, gt_pose, measure
     :param gt_pose: ground truth SMPL pose parameters
     :return: loss values (MPVPE, PA-MPVPE, PA-MPJPE, PA params)
     """
+    num_joints=22
     pred_full_pose = torch.cat([gt_pose[:, 0].unsqueeze(1), pred_pose], dim=1)
     
     # 0: root 
@@ -124,25 +166,12 @@ def get_similarity(smpl_layer, pred_shape, gt_shape, pred_pose, gt_pose, measure
         pad_len = required_pose_len - gt_pose.shape[1]
         gt_pose = torch.cat([gt_pose, torch.zeros(gt_pose.shape[0], pad_len, device=gt_pose.device)], dim=1)
 
-
-    #if(gt_shape.shape[1] == 10):
-     #   pred_full_shape = pred_shape
-    #else:
-        #pred_full_shape = torch.cat(
-         #   [
-        #        pred_shape,
-       #         gt_shape[:, -6:],
-      #      ],
-     #       dim=1,
-    #    )
-
-    
     pred_smpl_seq = SMPLSequence(
         smpl_layer=smpl_layer,
         poses_root=pred_full_pose[:, 0].reshape(1, -1),
         poses_body=pred_full_pose[:, 1:22].reshape(1, -1),
-        poses_left_hand=pred_full_pose[:, 22:37].reshape(1, -1),
-        poses_right_hand=pred_full_pose[:, 37:].reshape(1, -1),
+        #poses_left_hand=pred_full_pose[:, 22:37].reshape(1, -1),
+        #poses_right_hand=pred_full_pose[:, 37:].reshape(1, -1),
         betas=pred_shape,
     )
     pred_fk = pred_smpl_seq.fk()
@@ -160,25 +189,29 @@ def get_similarity(smpl_layer, pred_shape, gt_shape, pred_pose, gt_pose, measure
     pred_hat, vertex_hat, params = compute_similarity_transform(
         pred_fk[1].squeeze(),
         gt_fk[1].squeeze(),
-        num_joints=num_joints,
+        test_type='body',
         verts=gt_fk[0].squeeze(),
     )
+    pred_hat = pred_hat[:, :num_joints]
 
     MPVPE = np.mean(np.linalg.norm(pred_fk[0] - gt_fk[0], axis=-1)) * 1000 # in mm
     PA_MPVPE = np.mean(np.linalg.norm(vertex_hat - gt_fk[0], axis=-1)) * 1000 # in mm
-    PA_MPJPE = np.mean(np.linalg.norm(pred_hat - gt_fk[1], axis=-1)) * 1000 # in mm
+    PA_MPJPE = np.mean(np.linalg.norm(pred_hat - gt_fk[1][:, :num_joints], axis=-1)) * 1000 # in mm
     return MPVPE, PA_MPVPE, PA_MPJPE, params
 
 
 
 
 
-def compute_similarity_transform(S1, S2, num_joints, verts=None):
+def compute_similarity_transform(S1, S2, test_type='body', verts=None):
     """
     Computes a similarity transform (sR, t) that takes a set of 3D points S1 (3 x N) closest to a set of 3D points S2,
     where R is an 3x3 rotation matrix, t 3x1 translation, s scale. I.e., solves the orthogonal Procrutes problem.
     Borrowed from https://github.com/aymenmir1/3dpw-eval/blob/master/evaluate.py
     """
+
+    min_joint = 0 if test_type == 'body' else 22
+    max_joint = 22 if test_type == 'body' else 52
     transposed = False
     if S1.shape[0] != 3 and S1.shape[0] != 2:
         S1 = S1.T
@@ -189,8 +222,8 @@ def compute_similarity_transform(S1, S2, num_joints, verts=None):
     assert S2.shape[1] == S1.shape[1]
 
     # Use only body joints for procrustes
-    S1_p = S1[:, :num_joints]
-    S2_p = S2[:, :num_joints]
+    S1_p = S1[:, min_joint:max_joint]
+    S2_p = S2[:, min_joint:max_joint]
     # 1. Remove mean.
     mu1 = S1_p.mean(axis=1, keepdims=True)
     mu2 = S2_p.mean(axis=1, keepdims=True)
