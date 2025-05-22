@@ -15,7 +15,7 @@ def load_model(part="body"):
         run_name = "0509-2106_Run_3_cont_b79aa"
         epoch = 400
     elif part == "hand":
-        run_name = "0514-2042_Run_1_f87ca"
+        run_name = "0517-1703_Run_2_665ed"
         epoch = 300
     config_manager = ConfigManager(f"src/models/checkpoints/config_{run_name}.yaml")
     config = config_manager.get_config()

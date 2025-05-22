@@ -3,7 +3,7 @@ aug:
   crop_size: 256.0
   roi:
     angle: 25.0
-    scale: [0.05, 0.10]
+    scale: [-0.05, 0.10]
     trans: 0.06
   appearance:
     probs: 
