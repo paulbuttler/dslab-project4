@@ -12,10 +12,10 @@ def optimize_pose_shape(images, cam_int, ldmks, std, pose, shape, device):
         shape (Tensor): Shape parameters, shape [B, 10].
         device (str): Device to run the models on.
     Returns:
-        pose (Tensor): Optimized pose parameters (including SMPL global orientation??).
-        shape (Tensor): Optimized shape parameters.
+        pose (Tensor): Optimized pose parameters (including SMPL global orientation??), shape [B, 52, 3].
+        shape (Tensor): Optimized shape parameters, shape [B, 16].
         ??trans (Tensor): Optimized SMPL translation, shape [B, 3].
-        cam_ext (Tensor): Optimized camera extrinsics.
+        cam_ext (Tensor): Optimized camera extrinsics, shape [B, 4, 4].
     """
     # Placeholder for optimization logic
     pass
@@ -25,6 +25,3 @@ def full_model_inference(images, roi, cam_int, body_model, hand_model, device):
     ldmks, std, pose, shape = initial_pose_estimation(images, roi, body_model, hand_model, device)
 
     return optimize_pose_shape(images, cam_int, ldmks, std, pose, shape, device)
-
-
-
