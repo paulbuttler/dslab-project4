@@ -14,8 +14,8 @@ aug:
   roi:
     angle: 15.0
     scale:
-    - 0.04
-    - 0.08
+    - -0.05
+    - 0.15
     trans: 0.04
 backbone_feat_dim: 512
 backbone_name: hrnet_w18.ms_in1k
@@ -32,7 +32,7 @@ lr: 0.0001
 meta_file: /cluster/project/hilliges/dsl_4/hand/hand_meta.pkl
 min_lr: 1.0e-06
 mlp_head_hidden_dim: 512
-name: Run_1
+name: Run_2
 num_landmarks: 137
 num_pose_params: 15
 num_shape_params: 0
@@ -51,6 +51,6 @@ test_ratio: 0.0
 trans_weight: 2.0
 val_batch_size: 256
 val_interval: 150
-val_ratio: 0.1
+val_ratio: 0.05
 vis_dir: ../visualization
 weight_decay: 0.01
