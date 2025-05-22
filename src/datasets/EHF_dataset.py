@@ -1,10 +1,9 @@
 import sys
 from pathlib import Path
-
-from utils.roi import compute_roi
-
-
 sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from utils.initialization import initial_pose_estimation
+from utils.roi import compute_roi
 import os
 import torch
 import gzip
@@ -14,18 +13,31 @@ from utils.rottrans import rot2aa
 from torchvision.io import decode_image
 from torch.utils.data import Dataset, DataLoader
 from aitviewer.models.smpl import SMPLLayer  # type: ignore
-from utils.evaluation import evaluate_model, get_full_shape_and_pose, get_mesh_vertices, get_obj_file_vertices
+from utils.evaluation import get_similarity
 from torchvision.transforms import functional as F
 from scipy.spatial import procrustes
+from models.load import load_model
 import json
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 class EHF_Dataset(Dataset):
+    """
+    EHF Dataset
+    Data folder structure:
+    ├── EHF
+    │   ├── XX_2Djnt.json
+    │   ├── XX_img.jpg
+    │   ├── smplh
+    │   │   ├── XX_align.pkl
+
+    Where smplh contains the converted smplx data
+    """
+
 
     def __init__(self, 
-                 img_dir:str, 
+                 data_dir:str, 
                  device="cuda"):
-        self.img_dir = img_dir
+        self.img_dir = data_dir
 
         # Data
         self.img_paths = [os.path.join(self.img_dir, img_fn)
@@ -69,18 +81,9 @@ class EHF_Dataset(Dataset):
             body_keypoints = np.array(person_data['pose_keypoints_2d'],
                                   dtype=np.float32)
             joint2d = body_keypoints.reshape(-1, 3)
-
-            # Center crop to square
-            # h, w = img.shape[1], img.shape[2]
-            # min_dim = min(h, w)
-            # top = (h - min_dim) // 2
-            # left = (w - min_dim) // 2
-            # cropped_img = img[:, top:top+min_dim, left:left+min_dim]
-
-            # # Resize to 512x512
-            # cropped_img = F.resize(cropped_img, [512, 512])
-            # roi = compute_roi(joint2d[:, :2], cropped_img.cpu().numpy().transpose(1, 2, 0).copy())
-            roi = np.array(compute_roi(joint2d[:, :2], None), dtype=np.float32)
+            roi = np.array(compute_roi(joint2d[:, :2], None, margin=0.12, input_size=1600), dtype=np.float32)
+            print("roi?????????????????????????????????????", roi)
+            
 
 
         shape = frame_data['betas'].reshape(-1)
@@ -96,7 +99,6 @@ class EHF_Dataset(Dataset):
         vertices = frame_data['vertices'].reshape(1, -1, 3).to(device=self.device)
         print("\n---------------------------------------------------------------------------")
         print("Info", body_pose.shape, shape.shape, global_orient.shape, vertices.shape, roi)
-
         target = {
             'pose': pose,
             'shape': shape,
@@ -104,69 +106,36 @@ class EHF_Dataset(Dataset):
             # 'global_orient': global_orient,
             "landmarks": [],
             "translation": (0,0,0),
+            "joints2D": joint2d,
         }
 
         return img.squeeze(0), roi, target, index
 
 
 if __name__ == "__main__":
-    dataset = EHF_Dataset(img_dir="data/EHF", labels_dir="data/labels")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    dataset = EHF_Dataset(data_dir="data/EHF")
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
-    smpl_layer = SMPLLayer(model_type="smplh", gender="neutral")
+    smpl_layer = SMPLLayer(model_type="smplh", gender="neutral", num_betas=10)
+    body_model, body_config = load_model("body")
+    hand_model, hand_config = load_model("hand")
 
-    model, config = load_model("0503-2012_Run_2_cont_74664")
-
-    pve_t_sc = []
+    MPVPE_ls = []
+    PA_MPVPE_ls = []
+    PA_MPJPE_ls = []
     for i, batch in enumerate(dataloader):
-
-        (
-            images,
-            uids,
-            translation,
-            ldmks,
-            gt_shape,
-            gt_pose,
-            pred_ldmks,
-            pred_std,
-            pred_shape,
-            pred_pose,
-        ) = get_predictions(model, batch, config.device)
-
-        pred_full_shape, pred_full_pose = get_full_shape_and_pose(pred_shape.to(config.device), pred_pose.to(config.device), gt_shape.to(config.device), gt_pose.to(config.device))
-
-        print("bbb",pred_pose.shape, gt_pose.shape, pred_shape.shape, gt_shape.shape, pred_full_shape.shape, pred_full_pose.shape)
-        pred_v = get_mesh_vertices(smpl_layer, pred_full_shape, pred_full_pose.cpu().detach())
-        gt_v = torch.tensor(batch[1]['vertices'].reshape(-1, 3))
-
-        print("\n---------------------------------------------------------------------------")
-        print("pred_v min:", np.min(pred_v.cpu().numpy(), axis=0), "max:", np.max(pred_v.cpu().numpy(), axis=0))
-        print("gt_v min:", np.min(gt_v.cpu().numpy(), axis=0), "max:", np.max(gt_v.cpu().numpy(), axis=0))
-        pred_v_pa, gt_v_pa, disparity = procrustes(pred_v.cpu().numpy(), gt_v.cpu().numpy())
+        images, roi, targets, uids = batch
+        print("REACHED", device)
+        ldmks, std, pred_pose, pred_shape = initial_pose_estimation(images, roi, body_model, hand_model, device)
+        MPVPE, PA_MPVPE, PA_MPJPE, params = get_similarity(smpl_layer, pred_shape, targets['shape'], pred_pose, targets['pose'], measure_type="body", num_joints=22)
+        #print("MPVPE", MPVPE)
+        #print("PA_MPVPE", PA_MPVPE)
+        #print("PA_MPJPE", PA_MPJPE)
+        MPVPE_ls.append(MPVPE)
+        PA_MPVPE_ls.append(PA_MPVPE)
+        PA_MPJPE_ls.append(PA_MPJPE)
+    print("MPVPE", np.mean(MPVPE_ls))
+    print("PA_MPVPE", np.mean(PA_MPVPE_ls))
+    print("PA_MPJPE", np.mean(PA_MPJPE_ls))
         
-        print("\n---------------------------------------------------------------------------")
-        print("pred_v_pa min:", np.min(pred_v_pa, axis=0), "max:", np.max(pred_v_pa, axis=0))
-        print("gt_v_pa min:", np.min(gt_v_pa, axis=0), "max:", np.max(gt_v_pa, axis=0))
-        print(pred_v_pa.shape, gt_v_pa.shape, disparity)
-
-        print("\n---------------------------------------------------------------------------")
-        print("PA-MPVPE", np.mean(np.linalg.norm(pred_v_pa - gt_v_pa, axis=-1)))
-        print("---------------------------------------------------------------------------")
-        break
-        
-        # print(pred_full_shape.shape, gt_shape.shape)
-        # mse_shape = torch.mean((pred_full_shape.to(config.device)[:10] - gt_shape.to(config.device)) ** 2).item()
-        # print("MSE between gt_shape and pred_shape:", mse_shape)
-
-        # mse_pose = torch.mean((pred_p - gt_p) ** 2).item()
-        # print("MSE between gt_pose and pred_pose:", mse_pose)
-
-        # similarity = compute_similarity_transform(pred_p.numpy(), gt_p.numpy(), num_joints=24)
-        # pred_p_transformed = similarity[0]
-        # gt_p_transformed = similarity[1]
-
-        # mse_similarity = torch.mean((pred_p_transformed - gt_p_transformed) ** 2).item()
-        # print("MSE between gt_pose and pred_pose after similarity transform:", mse_similarity)
-
-
-        # mse_pose = 
 
