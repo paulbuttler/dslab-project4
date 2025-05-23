@@ -65,7 +65,7 @@ class SynDataset(Dataset):
             img, kp2d = img, kp2d
 
         # Normalize with ImageNet stats
-        img = self.normalize(img)
+        img = self.normalize(img) if self.mode != "test" else img
 
         # Normalize 2D landmark coordinates to [0, 1]
         kp2d = kp2d / img.shape[-1] if self.mode != "test" else kp2d
