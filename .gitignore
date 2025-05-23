@@ -3,8 +3,10 @@ __pycache__/
 data/
 wandb/
 experiments/checkpoints/
-experiments/synth_data/
+experiments/synth/
+experiments/ehf/
 tools/visualize/smplh/
 src/models/smplx/params/
 imgui.ini
 *.pth
+*.pt

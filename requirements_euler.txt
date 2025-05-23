@@ -9,3 +9,4 @@ pytorch-lightning==2.2.1
 opencv-python==4.11.0.86
 roma==1.5.2.1
 kornia==0.8.0
+joblib==1.4.2

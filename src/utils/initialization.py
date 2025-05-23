@@ -38,15 +38,16 @@ def initial_pose_estimation(images, roi, body_model, hand_model, device):
     ldmks = warp_back(ldmks, M)
 
     # Compute the hand ROIs in original image space based on predicted hand landmarks
-    left_hand_roi = compute_roi(ldmks[:, 665:802], None, 0.15, images.shape[-2]).to(device, dtype=torch.float32)
-    right_hand_roi = compute_roi(ldmks[:, 802:939], None, 0.15, images.shape[-2]).to(device, dtype=torch.float32)
+    left_hand_roi = compute_roi(ldmks[:, 665:802], None, 0.25, images.shape[-2]).to(device, dtype=torch.float32)
+    right_hand_roi = compute_roi(ldmks[:, 802:939], None, 0.25, images.shape[-2]).to(device, dtype=torch.float32)
 
     # Crop and normalize images for the hand model
     left_hand_img, M1 = apply_roi_transform(images, None, left_hand_roi, "test", 128.0)
     right_hand_img, M2 = apply_roi_transform(images, None, right_hand_roi, "test", 128.0)
     right_hand_img_flipped = torch.flip(right_hand_img, [-1])
 
-    #visualize_batch_of_images(cropped_images)
+    # visualize_batch_of_images(cropped_images)
+    # visualize_batch_of_images(left_hand_img)
     # visualize_batch_of_images(right_hand_img_flipped)
 
     left_hand_img = normalize(left_hand_img)

@@ -22,7 +22,6 @@ def compute_roi(landmarks, image=None, margin=0.08, input_size=512):
         center_x = (x_min + x_max) / 2
         center_y = (y_min + y_max) / 2
         box_size = (x_max - x_min).maximum(y_max - y_min) * (1.0 + margin)
-        box_size = box_size.minimum(landmarks.new_tensor(input_size))
 
         x_min = (center_x - box_size / 2).floor().to(torch.int32)
         y_min = (center_y - box_size / 2).floor().to(torch.int32)
@@ -31,7 +30,7 @@ def compute_roi(landmarks, image=None, margin=0.08, input_size=512):
 
         rois = torch.stack([x_min, y_min, x_max, y_max], dim=1)
         return rois
-    
+
     # NumPy single sample: (N, 2)
     x_min, y_min = np.min(landmarks, axis=0)
     x_max, y_max = np.max(landmarks, axis=0)
@@ -40,7 +39,10 @@ def compute_roi(landmarks, image=None, margin=0.08, input_size=512):
     center_y = (y_min + y_max) / 2
 
     box_size = max(x_max - x_min, y_max - y_min) * (1.0 + margin)
-    box_size = min(input_size, box_size)
+
+    # If box size is larger than input size, return the whole image
+    if box_size > input_size:
+        return np.array([0, 0, input_size, input_size])
 
     x_min = int(np.floor(center_x - box_size / 2))
     y_min = int(np.floor(center_y - box_size / 2))
