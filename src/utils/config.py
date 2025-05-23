@@ -32,7 +32,8 @@ class ConfigManager:
                 )
 
         # cuDNN optimization
-        torch.backends.cudnn.benchmark = self.config.cudnn_benchmark
+        if hasattr(self.config, 'cudnn_benchmark'):
+            torch.backends.cudnn.benchmark = self.config.cudnn_benchmark
 
     def _validate_config(self):
         # validate config
@@ -43,8 +44,8 @@ class ConfigManager:
             else:
                 print("GPU available!")
 
-        if self.config.batch_size <= 0:
-            raise ValueError("batch_size should be greater or equal to 0!")
+        # if self.config.batch_size <= 0:
+        #    raise ValueError("batch_size should be greater or equal to 0!")
 
     def get_config(self) -> SimpleNamespace:
         # get unltimate config
