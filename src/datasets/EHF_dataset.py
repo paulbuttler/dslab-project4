@@ -1,145 +1,101 @@
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-
-from utils.initialization import initial_pose_estimation
-from utils.roi import compute_roi
 import os
 import torch
-import gzip
 import pickle
-import numpy as np
-from utils.rottrans import rot2aa
-from torchvision.io import decode_image
-from torch.utils.data import Dataset, DataLoader
-from aitviewer.models.smpl import SMPLLayer  # type: ignore
-from utils.evaluation import get_similarity_body, get_similarity_hands
-from torchvision.transforms import functional as F
-from scipy.spatial import procrustes
-from models.load import load_model
 import json
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+import numpy as np
+from pathlib import Path
+from ultralytics import YOLO
+from torchvision.io import decode_image
+from torch.utils.data import Dataset
+from utils.rottrans import rot2aa
+from utils.roi import compute_roi
+
+# os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 
 class EHF_Dataset(Dataset):
     """
-    EHF Dataset
+    EHF Dataset for 3D human pose and shape estimation.
     Data folder structure:
-    ├── EHF
-    │   ├── XX_2Djnt.json
-    │   ├── XX_img.jpg
-    │   ├── smplh
-    │   │   ├── XX_align.pkl
+    EHF
+    ├── XX_2Djnt.json (OpenPose 2D joints)
+    ├── XX_img.jpg
+    ├── smplh
+    │   ├── XX_align.pkl (SMPLH model parameters converted from SMPL-X)
+    └── ...
 
-    Where smplh contains the converted smplx data
+    Where XX is the index of the sample (01, 02, ..., 99).
     """
 
-
-    def __init__(self, 
-                 data_dir:str, 
-                 device="cuda"):
-        self.img_dir = data_dir
-
-        # Data
-        self.img_paths = [os.path.join(self.img_dir, img_fn)
-                    for img_fn in os.listdir(self.img_dir)
-                    if img_fn.endswith('.jpg') and not img_fn.startswith('.')
-        ]
-        print(len(self.img_paths))
-        self.device = device
-        
+    def __init__(self, data_dir: Path):
+        self.data_dir = data_dir
+        self.roi_extractor = YOLO("yolov8m.pt")
 
     def __len__(self):
-        return len(self.img_paths)
+        return 100
 
-    def __getitem__(self, index):
-        if torch.is_tensor(index):
-            index = index.tolist()
+    def __getitem__(self, idx):
+        idx = idx + 1
+        img_file = self.data_dir / f"{idx:02d}_img.jpg"
+        joints_file = self.data_dir / f"{idx:02d}_2Djnt.json"
+        meta_file = self.data_dir / "smplh" / f"{idx:02d}_align.pkl"
 
-        img_path = self.img_paths[index]
-        print("Load", img_path)
-        # img = (decode_image(img_path).float().to(self.device) / 255.0).unsqueeze(0)
-        # Load image as tensor
-        img = decode_image(img_path).float().to(self.device) / 255.0
+        with open(meta_file, "rb") as f:
+            metadata = pickle.load(f)
 
-        
+        # Extract pose and shape
+        shape = metadata["betas"][0].cpu().detach()
+        pose = metadata["full_pose"][0].cpu().detach()
+        pose = rot2aa(pose)
+        transl = metadata["transl"].cpu().detach() if metadata["transl"] is not None else torch.zeros(3)
 
-        base_path = os.path.split(img_path)[0]
+        img = decode_image(img_file).float() / 255.0
 
-        img_fn = os.path.split(img_path)[1]
-        img_fn, _ = os.path.splitext(os.path.split(img_path)[1])
-        txt_index = img_fn.split("_")[0]
+        # Get the bounding box from the YOLO model
+        results = self.roi_extractor.predict(img_file, classes=[0], verbose=False)[0]
 
-        frame_path = os.path.join(base_path, "smplh", f"{txt_index}_align.pkl")
-        frame_data = np.load(frame_path, allow_pickle=True)
-        
-        joint2d_path = os.path.join(base_path, f"{txt_index}_2Djnt.json")
-        with open(joint2d_path, "r") as f:
-            joint2d_data = json.load(f)
+        # Extract highest confidence bbox corners (xyxy: [x1, y1, x2, y2])
+        if results.boxes is not None and len(results.boxes) > 0:
+            boxes = results.boxes.xyxy.cpu().numpy()
+            confs = results.boxes.conf.cpu().numpy()
+            max_idx = np.argmax(confs)
+            bbox_corners = boxes[max_idx]
 
-        roi = None
-        for idx, person_data in enumerate(joint2d_data['people']):
-            body_keypoints = np.array(person_data['pose_keypoints_2d'],
-                                  dtype=np.float32)
-            joint2d = body_keypoints.reshape(-1, 3)
-            roi = np.array(compute_roi(joint2d[:, :2], None, margin=0.12, input_size=1600), dtype=np.float32)
-            print("roi?????????????????????????????????????", roi)
-            
+            # Add margin and make square
+            x1, y1, x2, y2 = bbox_corners
+            w = x2 - x1
+            h = y2 - y1
+            margin = 0.05  # 5% margin
 
+            # Expand bbox by margin
+            cx = (x1 + x2) / 2
+            cy = (y1 + y2) / 2
+            side = max(w, h) * (1 + margin)
+            new_x1 = cx - side / 2
+            new_y1 = cy - side / 2
+            new_x2 = cx + side / 2
+            new_y2 = cy + side / 2
 
-        shape = frame_data['betas'].reshape(-1)
-        body_pose = frame_data['body_pose'].reshape(1, -1)
-        global_orient = frame_data['global_orient'].reshape(1, -1)
+            roi = np.array([new_x1, new_y1, new_x2, new_y2])
 
-        body_pose = torch.cat([global_orient, body_pose], dim=1)
-        body_pose = body_pose.reshape(-1, 3, 3)
-        body_pose = rot2aa(body_pose).reshape(-1)
-        pose = torch.cat([body_pose, torch.zeros(52*3 - body_pose.numel())])
-        pose = pose.view(-1, 3)
+        else:
+            # If no bounding box is detected, use OpenPose joints for ROI computation
+            with open(joints_file, "r") as f:
+                joint2d_data = json.load(f)
+            joints2d = np.asarray(joint2d_data["people"][0]["pose_keypoints_2d"]).reshape(-1, 3)
+            joints2d = joints2d[~np.all(joints2d == 0, axis=1)]
+            joints2d = joints2d[:, :2]
+            roi = compute_roi(joints2d, None, margin=0.3, input_size=1600)
 
-        vertices = frame_data['vertices'].reshape(1, -1, 3).to(device=self.device)
-        print("\n---------------------------------------------------------------------------")
-        print("Info", body_pose.shape, shape.shape, global_orient.shape, vertices.shape, roi)
         target = {
-            'pose': pose,
-            'shape': shape,
-            'vertices': vertices,
-            # 'global_orient': global_orient,
-            "landmarks": [],
-            "translation": (0,0,0),
-            "joints2D": joint2d,
+            "pose": pose,
+            "shape": shape,
+            "translation": transl,
+            "roi": torch.from_numpy(roi).float(),
+            "cam_int": torch.tensor(
+                [[1498.22426237, 0.0, 790.263706], [0.0, 1498.22426237, 578.90334], [0.0, 0.0, 1.0]],
+                dtype=torch.float32,
+            ),
         }
 
-        return img.squeeze(0), roi, target, index
-
-
-if __name__ == "__main__":
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    dataset = EHF_Dataset(data_dir="data/EHF")
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
-    smpl_layer = SMPLLayer(model_type="smplh", gender="neutral", num_betas=10)
-    body_model, body_config = load_model("body")
-    hand_model, hand_config = load_model("hand")
-
-    MPVPE_ls = []
-    PA_MPVPE_ls = []
-    PA_MPJPE_ls = []
-    PA_MPJPE_hand_ls = []
-    for i, batch in enumerate(dataloader):
-        images, roi, targets, uids = batch
-        print("REACHED", device)
-        ldmks, std, pred_pose, pred_shape = initial_pose_estimation(images, roi, body_model, hand_model, device)
-        MPVPE, PA_MPVPE, PA_MPJPE, params = get_similarity_body(smpl_layer, pred_shape, targets['shape'], pred_pose, targets['pose'])
-        # PA_MPJPE_hand = get_similarity_hands(smpl_layer, pred_shape, targets['shape'], pred_pose, targets['pose'])
-        #print("MPVPE", MPVPE)
-        #print("PA_MPVPE", PA_MPVPE)
-        #print("PA_MPJPE", PA_MPJPE)
-        MPVPE_ls.append(MPVPE)
-        PA_MPVPE_ls.append(PA_MPVPE)
-        PA_MPJPE_ls.append(PA_MPJPE)
-        # PA_MPJPE_hand_ls.append(PA_MPJPE_hand)
-
-    print("MPVPE", np.mean(MPVPE_ls))
-    print("PA_MPVPE", np.mean(PA_MPVPE_ls))
-    print("PA_MPJPE", np.mean(PA_MPJPE_ls))
-    print("PA_MPJPE_hand", np.mean(PA_MPJPE_hand_ls))
-
+        return img, target, idx
