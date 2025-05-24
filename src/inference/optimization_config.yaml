@@ -1,0 +1,7 @@
+ldmk_indices_file: src/visualization/vertices/complete_vertices.npy
+smplh_model_path: src/models/smplx/params/smplh
+
+vposer_cfg_path: src/inference/vposer/V02_05/V02_05.yaml
+vposer_param_path: src/inference/vposer/V02_05/snapshots/V02_05_epoch=13_val_loss=0.03.ckpt
+
+device: cuda:0

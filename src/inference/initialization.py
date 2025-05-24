@@ -6,6 +6,7 @@ from models.load import load_model, get_val_dataloader
 from datasets.transforms import apply_roi_transform, normalize, denormalize, warp_back
 from torchvision.utils import make_grid
 
+
 def initial_pose_estimation(images, roi, body_model, hand_model, device):
     """
     Perform initial pose, shape and refined landmark estimation using trained body and hand models on full images given a bounding box ROI.
@@ -78,12 +79,12 @@ def initial_pose_estimation(images, roi, body_model, hand_model, device):
     ldmks[:, 802:939] = right_hand_ldmks_orig
 
     # Compute statistics of the landmark std deviations
-    body_std = torch.mean(std[:, :665], dim=1)
-    left_hand_std = torch.mean(left_hand_std, dim=1)
-    right_hand_std = torch.mean(right_hand_std, dim=1)
-    print(f"Body std mean, min, max: {body_std.mean(), body_std.min(), body_std.max()}")
-    print(f"Left hand std mean, min, max: {left_hand_std.mean(), left_hand_std.min(), left_hand_std.max()}")
-    print(f"Right hand std mean, min, max: {right_hand_std.mean(), right_hand_std.min(), right_hand_std.max()}")
+    # body_std = torch.mean(std[:, :665], dim=1)
+    # left_hand_std = torch.mean(left_hand_std, dim=1)
+    # right_hand_std = torch.mean(right_hand_std, dim=1)
+    # print(f"Body std mean, min, max: {body_std.mean(), body_std.min(), body_std.max()}")
+    # print(f"Left hand std mean, min, max: {left_hand_std.mean(), left_hand_std.min(), left_hand_std.max()}")
+    # print(f"Right hand std mean, min, max: {right_hand_std.mean(), right_hand_std.min(), right_hand_std.max()}")
 
     # Concatenate pose parameters and flip the right hand pose
     pose = torch.cat([body_pose, left_hand_pose, right_hand_pose_flipped], dim=1)
@@ -91,12 +92,14 @@ def initial_pose_estimation(images, roi, body_model, hand_model, device):
     pose[:, -15:] *= torch.tensor([1.0, -1.0, -1.0], device=pose.device)
     return ldmks, std, pose, shape
 
+
 def visualize_batch_of_images(images):
     grid = make_grid(images, nrow=5, padding=2)  # [C, H', W']
     grid_np = grid.permute(1, 2, 0).cpu().numpy()  # [H', W', C]
     grid_bgr = cv2.cvtColor(grid_np, cv2.COLOR_RGB2BGR)
     cv2.imshow("Batch Grid", grid_bgr)
     cv2.waitKey(0)
+
 
 # Example usage
 if __name__ == "__main__":
@@ -110,10 +113,8 @@ if __name__ == "__main__":
     val_loader = get_val_dataloader(config, data_root, meta_file, 5, "test")
 
     images, targets, uids = next(iter(val_loader))
-    roi = targets["roi"].to(config.device)
-
     images = images.to(config.device)
-    images = denormalize(images)
+    roi = targets["roi"].to(config.device)
 
     # Perform pose, shape and refined landmark estimation
     ldmks, std, pose, shape = initial_pose_estimation(images, roi, body_model, hand_model, config.device)
