@@ -3,8 +3,6 @@ __pycache__/
 data/
 wandb/
 experiments/checkpoints/
-experiments/synth/
-experiments/ehf/
 tools/visualize/smplh/
 src/models/smplx/params/
 src/inference/vposer/
