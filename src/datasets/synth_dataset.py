@@ -1,6 +1,7 @@
 import os
 import torch
 import joblib
+import json
 from pathlib import Path
 import kornia.augmentation as K
 from torchvision.io import decode_image
@@ -78,6 +79,10 @@ class SynDataset(Dataset):
         }
         if self.mode == "test":
             target["roi"] = roi.squeeze(0).cpu()
+            meta_path = os.path.join(self.img_dir, f"metadata_{uid}.json")
+            with open(meta_path, "r") as f:
+                meta = json.load(f)
+            target["cam_int"] = torch.tensor(meta["camera"]["camera_to_image"], dtype=torch.float32)
 
         return img.squeeze(0).cpu(), target, uid
 

@@ -7,6 +7,8 @@ experiments/synth/
 experiments/ehf/
 tools/visualize/smplh/
 src/models/smplx/params/
+src/inference/vposer/
+src/utils/visualize/smplh/
 imgui.ini
 *.pth
 *.pt
