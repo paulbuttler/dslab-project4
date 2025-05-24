@@ -34,7 +34,7 @@ import pyrender
 import trimesh
 from transformations import rotation_matrix
 
-from smpl_numpy import SMPL
+from .smpl_numpy import SMPL
 
 SEMSEG_LUT = (plt.get_cmap("tab20")(np.arange(255 + 1)) * 255).astype(np.uint8)[..., :3][..., ::-1]
 LDMK_CONN = {
