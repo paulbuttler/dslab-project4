@@ -4,19 +4,50 @@ This repository implements hand and body pose estimation as presented in the pap
 
 We use the extended SMPL+H body model from [MANO](https://mano.is.tue.mpg.de/) as a substitute for the SOMA model used in the paper, which is not publicly available.
 
-## Setup
+## Installation
 After cloning this repository and navigating to its root folder, create a virtual environment and install all required packages:
 ```
 conda create --name dslab python=3.10
 conda activate dslab
 pip install -r requirements.txt
 ```
+Install the latest version of [smplx](https://github.com/vchoutas/smplx) from GitHub.
+```
+git clone https://github.com/vchoutas/smplx
+cd smplx
+python setup.py install
+```
+Install the developer version of the [aitviewer](https://github.com/eth-ait/aitviewer) from GitHub.
+```
+git clone https://github.com/eth-ait/aitviewer.git
+cd aitviewer
+pip install -e .
+```
+Install [vposer](https://github.com/nghorbani/human_body_prior) from GitHub.
+```
+https://github.com/nghorbani/human_body_prior.git
+cd human_body_prior
+python setup.py install
+```
 
-Note: Developer versions of the smplx and aitviewer packages are required for full functionality. In particular, edit `aitviewer/models/smpl.py` and uncomment lines 39–40 to use the neutral SMPL+H model.
+Add the `src` directory to your Python path.
 
-Ensure the `src` directory is added to your Python path.
+If you run into an attribute error with '_ctx' try running
+```
+pip install moderngl-window==2.4.6 pyglet
+```
 
-### Datasets
+### Important edits
+To use the neutral SMPL+H model with the aitviewer make the following changes to these files:
+
+In `aitviewer/models/smpl.py` uncomment lines 39–40 and in `aitviewer\renderables\smpl.py` uncomment lines 160-166. 
+
+## Parametric Human Body Model
+Download the MANO and extended SMPL+H models from the [MANO download page](https://mano.is.tue.mpg.de/download.php). 
+
+Follow the instructions [here](https://github.com/vchoutas/smplx/blob/main/tools/README.md) to merge the neutral SMPL+H model used in AMASS with MANO parameters. Create the folder `src/models/smplx/params/smplh/` and place the created `SMPLH_NEUTRAL.pkl` file inside.
+
+## Datasets
 The `tools` directory contains scripts provided by the authors of the paper. See [DATASETS.md](tools/DATASETS.md) for detailed instructions.
 
 Download the SynthBody and SynthHand datasets into `data/raw` using the script provided in `tools/download`.
@@ -29,13 +60,7 @@ Repeat with the `--hand` flag to generate hand landmarks.
 ```bash
 python tools/preprocess/generate_ldmks.py --hand
 ```
-
-This process can take a significant amount of time to complete.
-
-### Parametric Human Body Model
-Download the MANO and extended SMPL+H models from the [MANO download page](https://mano.is.tue.mpg.de/download.php). 
-
-Follow the instructions [here](https://github.com/vchoutas/smplx/blob/main/tools/README.md) to merge the neutral SMPL+H model used in AMASS with MANO parameters. Create the folder `src/models/smplx/params/smplh/` and place the created `SMPLH_NEUTRAL.pkl` file inside.
+This process can take a few hours to complete.
 
 ## Visualization
 
