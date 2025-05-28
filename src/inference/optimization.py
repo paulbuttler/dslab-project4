@@ -260,16 +260,7 @@ if __name__ == "__main__":
     images, targets, uids = next(iter(val_loader))
     images = images.to(config.device)
     roi = targets["roi"].to(config.device)
-
-    cam_int = []
-    for uid in uids:
-        meta_file = f"data/raw/synth_body/metadata_{uid}.json"
-        with open(meta_file, "r") as f:
-            metadata = json.load(f)
-
-        K = torch.tensor(metadata["camera"]["camera_to_image"], dtype=torch.float32, device=config.device)
-        cam_int.append(K)
-    cam_int = torch.stack(cam_int, dim=0)
+    cam_int = targets["cam_int"].to(config.device)
 
     print(images.shape, roi.shape, cam_int.shape)
 

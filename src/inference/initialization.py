@@ -116,7 +116,7 @@ if __name__ == "__main__":
     images = images.to(config.device)
     roi = targets["roi"].to(config.device)
 
-    # Perform pose, shape and refined landmark estimation
+    # Perform initial pose, shape and refined landmark estimation
     ldmks, std, pose, shape = initial_pose_estimation(images, roi, body_model, hand_model, config.device)
 
     print(f"Landmarks shape: {ldmks.shape}")
