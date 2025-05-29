@@ -12,9 +12,7 @@ from datasets.EHF_dataset import EHF_Dataset
 from torch.utils.data import DataLoader
 
 
-def visualize_landmarks(
-    images, pred_ldmks, gt_ldmks=None, std=None, n=100, save_dir="./experiments/body/visualization"
-):
+def visualize_landmarks(images, pred_ldmks, gt_ldmks=None, std=None, n=100, save_dir="./experiments/synth/full"):
     """
     Visualizes a subset of predicted landmarks (and optionally ground truth and uncertainty)
     on a batch of images. Saves each visualization as a separate file.
@@ -101,7 +99,7 @@ def visualize_landmarks(
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--part", choices=["body", "hand", "full"], default="body")
+    parser.add_argument("--part", choices=["body", "hand", "full"], default="full")
     parser.add_argument("--dataset", choices=["synth", "ehf"], default="synth")
     args = parser.parse_args()
 
@@ -151,22 +149,22 @@ if __name__ == "__main__":
         hand_model, _ = load_model("hand")
 
         if dataset == "synth":
-            data_root = "data/raw/synth_body"
+            data_root = "data/synth_body"
             meta_file = "data/annot/body_meta.pkl"
             test_loader = get_val_dataloader(config, data_root, meta_file, 10, "test")
 
         elif dataset == "ehf":
-            test_dataset = EHF_Dataset(data_dir=Path("data/raw/EHF"))
+            test_dataset = EHF_Dataset(data_dir=Path("data/EHF"))
             test_loader = DataLoader(test_dataset, batch_size=10, shuffle=False)
 
         images, targets, uids = next(iter(test_loader))
         roi = targets["roi"].to(config.device)
         images = images.to(config.device)
 
-        # Perform pose, shape and refined landmark estimation
+        # Perform initial pose, shape and refined landmark estimation
         ldmks, std, pose, shape = initial_pose_estimation(images, roi, body_model, hand_model, config.device)
 
-        # Concatenate global orientation
+        # Concatenate ground-truth global orientation
         gt_pose = targets["pose"]
         full_pose = torch.cat([gt_pose[:, 0].unsqueeze(1), pose], dim=1)
 

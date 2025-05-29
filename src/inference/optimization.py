@@ -56,7 +56,7 @@ def full_model_inference(images, rois, cam_int, body_model, hand_model, device):
     Rs = torch.stack(R_list, dim=0)
     ts = torch.stack(t_list, dim=0)
 
-    return poses, shapes, Rs, ts
+    return poses.cpu(), shapes.cpu(), Rs.cpu(), ts.cpu()
 
 
 def optimize_pose_shape(

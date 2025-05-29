@@ -96,7 +96,7 @@ def get_vertices_and_joints(pose, shape):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", choices=["synth", "ehf"], default="ehf")
-    parser.add_argument("--optimization", action="store_true", default=False)
+    parser.add_argument("--optimize", action="store_true", default=False)
     parser.add_argument("--visualize", action="store_true", default=False)
     args = parser.parse_args()
 
@@ -140,20 +140,8 @@ if __name__ == "__main__":
         gt_pose = targets["pose"]
         gt_shape = targets["shape"]
 
-        if args.optimization:
+        if args.optimize:
             pred_pose, pred_shape, R, t = full_model_inference(images, rois, cam_int, body_model, hand_model, device)
-
-            for idx in np.random.choice(len(uids), size=2, replace=False):
-                visualize_optimization(
-                    images[idx],
-                    pred_shape[idx].cpu().numpy(),
-                    pred_pose[idx].cpu().numpy(),
-                    R[idx].cpu().numpy(),
-                    t[idx].cpu().numpy(),
-                    cam_int[idx],
-                    uids[idx],
-                    f"experiments/{args.dataset}/",
-                )
         else:
             ldmks, std, pred_pose, pred_shape = initial_pose_estimation(images, rois, body_model, hand_model, device)
             pred_pose = torch.cat([torch.zeros((pred_pose.shape[0], 1, 3), device=pred_pose.device), pred_pose], dim=1)
@@ -278,7 +266,7 @@ if __name__ == "__main__":
     PA_MPVPE = {key: val / N * 1000 for key, val in PA_MPVPE.items()}
     PA_MPJPE = {key: val / N * 1000 for key, val in PA_MPJPE.items()}
 
-    print("\nEvaluation results with" + "out" * (not args.optimization) + " optimization:\n")
+    print("\nEvaluation results with" + "out" * (not args.optimize) + " optimization:\n")
     print("MPVPE", MPVPE)
     print("PA_MPVPE", PA_MPVPE)
     print("PA_MPJPE", PA_MPJPE)
