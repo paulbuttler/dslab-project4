@@ -110,8 +110,8 @@ if __name__ == "__main__":
         test_loader = DataLoader(dataset, batch_size=20, shuffle=False)
 
     elif args.dataset == "synth":
-        data_root = "data/raw/synth_body"
-        meta_file = "data/annotations/body_meta.pkl"
+        data_root = "data/synth_body"
+        meta_file = "data/annot/body_meta.pkl"
         test_loader = get_val_dataloader(config, data_root, meta_file, 100, "test")
 
     with open("src/evaluation/smpl_vert_segmentation.json", "r") as f:

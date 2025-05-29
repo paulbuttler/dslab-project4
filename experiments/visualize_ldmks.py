@@ -109,8 +109,8 @@ if __name__ == "__main__":
     part = args.part if dataset == "synth" else "full"
 
     if part == "body" or part == "hand":
-        data_root = f"data/raw/synth_{part}"
-        meta_file = f"data/annotations/{part}_meta.pkl"
+        data_root = f"data/synth_{part}"
+        meta_file = f"data/annot/{part}_meta.pkl"
 
         model, config = load_model(part)
         val_loader = get_val_dataloader(config, data_root, meta_file, 10)
@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
         if dataset == "synth":
             data_root = "data/raw/synth_body"
-            meta_file = "data/annotations/body_meta.pkl"
+            meta_file = "data/annot/body_meta.pkl"
             test_loader = get_val_dataloader(config, data_root, meta_file, 10, "test")
 
         elif dataset == "ehf":
