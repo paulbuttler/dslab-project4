@@ -1,6 +1,6 @@
 # Look Ma, No Markers - Implementation for 3D Body and Hand Pose Estimation
 
-This repository implements hand and body pose estimation based on the paper [*Look Ma, no markers*](https://microsoft.github.io/SynthMoCap/) [Hewitt et al., 2024], using synthetic [data](https://github.com/microsoft/SynthMoCap) provided by the authors.
+This repository implements 3D body and hand pose estimation based on the paper [*Look Ma, no markers*](https://microsoft.github.io/SynthMoCap/) [Hewitt et al., 2024], using synthetic [data](https://github.com/microsoft/SynthMoCap) provided by the authors.
 
 <p float="left">
  <img src="experiments/synth/full/ldmks_id_0000801_001.png" width="300" />
