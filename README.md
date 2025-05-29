@@ -1,11 +1,10 @@
-# Look Ma No Markers - Implementation for 3D Body and Hand Pose Estimation
+# Look Ma, No Markers - Implementation for 3D Body and Hand Pose Estimation
 
-This repository implements hand and body pose estimation based on the paper [Look Ma, no markers](https://microsoft.github.io/SynthMoCap/), using synthetic [data](https://github.com/microsoft/SynthMoCap) provided by the authors.
+This repository implements hand and body pose estimation based on the paper [*Look Ma, no markers*](https://microsoft.github.io/SynthMoCap/) [Hewitt et al., 2024], using synthetic [data](https://github.com/microsoft/SynthMoCap) provided by the authors.
 
 <p float="left">
- <img src="experiments/synth/full/ldmks_id_0000801_001.png" width="250" style="margin-right: 10px;"/>
- <img src="experiments/synth/mesh_id_0005682_004.png" width="250" style="margin-right: 10px;"/>
-  <img src="experiments/ehf/landmarks/ldmks_id_22.png" height="250" style="margin-right: 10px;"/>
+ <img src="experiments/synth/full/ldmks_id_0000801_001.png" width="250" />
+ <img src="experiments/synth/mesh_id_0005682_004.png" width="250" />
  <img src="experiments/ehf/mesh_id_47.png" height="250"/>
 </p>
 
@@ -180,4 +179,6 @@ Optional flags are:
 * `--visualize`      Visualize predictions for randomly selected samples from each batch
 
 ## Acknowledgments
-We thank the authors of [Look Ma, no markers](https://microsoft.github.io/SynthMoCap/) for providing synthetic datasets and code that supports this implementation.
+We would like to thank our supervisor, Dr. Manuel Kaufmann, for his support and valuable feedback throughout the project.
+
+We also thank the authors of [*Look Ma, no markers*](https://microsoft.github.io/SynthMoCap/) [Hewitt et al., 2024] for sharing both their method and the synthetic datasets we used, and the authors of [SMPL-X](https://smpl-x.is.tue.mpg.de/) [Pavlakos et al., 2019] for releasing their model code. We used the [MANO model](https://mano.is.tue.mpg.de/) [Romero et al., 2017] for hand pose estimation, and [AITViewer](https://eth-ait.github.io/aitviewer/) for 3D visualization throughout development and evaluation.
