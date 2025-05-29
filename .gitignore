@@ -8,5 +8,6 @@ src/models/smplx/params/
 src/inference/vposer/
 src/utils/visualize/smplh/
 imgui.ini
+job.sh
 *.pth
 *.pt

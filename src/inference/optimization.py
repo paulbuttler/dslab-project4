@@ -243,7 +243,7 @@ def visualize_optimization(img, shape, pose, R, tvec, K, id, dir="experiments/eh
     plt.figure(figsize=(6, 6))
     plt.imshow(optimized_mesh_image)
     plt.axis("off")
-    plt.savefig(dir + f"mesh_id_{id}.pdf", bbox_inches="tight")
+    plt.savefig(dir + f"mesh_id_{id}.png", bbox_inches="tight")
 
 
 # Example usage
