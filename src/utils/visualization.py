@@ -78,11 +78,11 @@ def visualize_pose_and_shape(
     for idx in np.random.choice(len(uids), size=2, replace=False):
         if dataset == "synth":
             if part == "body" or part == "full":
-                img_file = f"data/raw/synth_body/img_{uids[idx]}.jpg"
-                meta_file = f"data/raw/synth_body/metadata_{uids[idx]}.json"
+                img_file = f"data/synth_body/img_{uids[idx]}.jpg"
+                meta_file = f"data/synth_body/metadata_{uids[idx]}.json"
             elif part == "hand":
-                img_file = f"data/raw/synth_hand/img_{uids[idx]}.jpg"
-                meta_file = f"data/raw/synth_hand/metadata_{uids[idx]}.json"
+                img_file = f"data/synth_hand/img_{uids[idx]}.jpg"
+                meta_file = f"data/synth_hand/metadata_{uids[idx]}.json"
 
             if billboard:
                 with open(meta_file, "r") as f:
@@ -93,7 +93,7 @@ def visualize_pose_and_shape(
                 camera_to_image = np.asarray(metadata["camera"]["camera_to_image"])
 
         elif dataset == "ehf":
-            img_file = os.path.join("data/raw/EHF", f"{uids[idx]:02d}_img.jpg")
+            img_file = os.path.join("data/EHF", f"{uids[idx]:02d}_img.jpg")
 
             if billboard:
                 # Get camera data
@@ -163,7 +163,6 @@ def visualize_prediction(images, pose, shape, cam_int, cam_ext):
 
     images = images.permute(0, 2, 3, 1).cpu().numpy()  # [B, H, W, C]
     images = (images * 255).astype(np.uint8)
-    images = [cv2.cvtColor(img, cv2.COLOR_RGB2BGR) for img in images]
 
     for idx in range(B):
         smpl_seq = SMPLSequence(
@@ -180,7 +179,7 @@ def visualize_prediction(images, pose, shape, cam_int, cam_ext):
         v = Viewer(size=(cols, rows))
         camera = OpenCVCamera(cam_int[idx].numpy(), cam_ext[idx].numpy(), cols, rows, viewer=v)
         billboard = Billboard.from_camera_and_distance(camera, 5.0, cols, rows, [img_np])
-        v.scene.add(billboard, camera, smpl_seq)
+        v.scene.add(billboard, smpl_seq, camera)
         v.set_temp_camera(camera)
 
         v.scene.floor.enabled = False

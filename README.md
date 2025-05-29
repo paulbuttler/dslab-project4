@@ -2,6 +2,13 @@
 
 This repository implements hand and body pose estimation based on the paper [Look Ma, no markers](https://microsoft.github.io/SynthMoCap/), using synthetic [data](https://github.com/microsoft/SynthMoCap) provided by the authors.
 
+<p float="left">
+ <img src="experiments/synth/full/ldmks_id_0000801_001.png" width="250" style="margin-right: 10px;"/>
+ <img src="experiments/synth/mesh_id_0005682_004.png" width="250" style="margin-right: 10px;"/>
+  <img src="experiments/ehf/landmarks/ldmks_id_22.png" height="250" style="margin-right: 10px;"/>
+ <img src="experiments/ehf/mesh_id_47.png" height="250"/>
+</p>
+
 We use the extended SMPL+H body model from [MANO](https://mano.is.tue.mpg.de/) as a substitute for the SOMA model used in the paper, which is not publicly available.
 
 ## Installation

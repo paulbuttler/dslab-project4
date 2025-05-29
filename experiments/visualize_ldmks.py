@@ -12,12 +12,13 @@ from datasets.EHF_dataset import EHF_Dataset
 from torch.utils.data import DataLoader
 
 
-def visualize_landmarks(images, pred_ldmks, gt_ldmks=None, std=None, n=100, save_dir="./experiments/synth/full"):
+def visualize_landmarks(uids, images, pred_ldmks, gt_ldmks=None, std=None, n=100, save_dir="./experiments/synth/full"):
     """
     Visualizes a subset of predicted landmarks (and optionally ground truth and uncertainty)
     on a batch of images. Saves each visualization as a separate file.
 
     Args:
+        uids (list): Unique identifiers for each image in the batch.
         images (Tensor): Batch of input images, shape [B, C, H, W].
         pred_ldmks (array-like): Predicted landmarks, shape [B, N, 2].
         gt_ldmks (array-like, optional): Ground truth landmarks, shape [B, N, 2].
@@ -38,7 +39,7 @@ def visualize_landmarks(images, pred_ldmks, gt_ldmks=None, std=None, n=100, save
     if std is not None:
         std = np.asarray(std[:, sample_indices])  # [B, n]
 
-    for i in range(images.shape[0]):
+    for i in range(len(uids)):
         img = images[i].permute(1, 2, 0).cpu().numpy()
 
         pred_points = pred_ldmks[i]  # [n, 2]
@@ -90,8 +91,8 @@ def visualize_landmarks(images, pred_ldmks, gt_ldmks=None, std=None, n=100, save
         ax.legend(unique_labels.values(), unique_labels.keys(), loc="upper right", fontsize=9)
 
         os.makedirs(save_dir, exist_ok=True)
-        save_path = os.path.join(save_dir, f"sample_{i+1}.pdf")
-        plt.savefig(save_path, bbox_inches="tight")
+        save_path = os.path.join(save_dir, f"ldmks_id_{uids[i]}.png")
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
         print(f"\nSaved visualization: {save_path}")
         plt.close()
 
@@ -111,7 +112,7 @@ if __name__ == "__main__":
         meta_file = f"data/annot/{part}_meta.pkl"
 
         model, config = load_model(part)
-        val_loader = get_val_dataloader(config, data_root, meta_file, 10)
+        val_loader = get_val_dataloader(config, data_root, meta_file, 5)
         batch = next(iter(val_loader))
 
         (
@@ -132,6 +133,7 @@ if __name__ == "__main__":
 
         # Visualize landmarks, pose and shape
         visualize_landmarks(
+            uids,
             images,
             pred_ldmks,
             landmarks,
@@ -151,11 +153,11 @@ if __name__ == "__main__":
         if dataset == "synth":
             data_root = "data/synth_body"
             meta_file = "data/annot/body_meta.pkl"
-            test_loader = get_val_dataloader(config, data_root, meta_file, 10, "test")
+            test_loader = get_val_dataloader(config, data_root, meta_file, 5, "test")
 
         elif dataset == "ehf":
             test_dataset = EHF_Dataset(data_dir=Path("data/EHF"))
-            test_loader = DataLoader(test_dataset, batch_size=10, shuffle=False)
+            test_loader = DataLoader(test_dataset, batch_size=5, shuffle=True)
 
         images, targets, uids = next(iter(test_loader))
         roi = targets["roi"].to(config.device)
@@ -170,6 +172,7 @@ if __name__ == "__main__":
 
         # Visualize landmarks, pose and shape
         visualize_landmarks(
+            uids,
             images,
             ldmks,
             None,
