@@ -106,7 +106,7 @@ if __name__ == "__main__":
     hand_model, _ = load_model("hand")
 
     if args.dataset == "ehf":
-        dataset = EHF_Dataset(data_dir=Path("data/raw/EHF"))
+        dataset = EHF_Dataset(data_dir=Path("data/EHF"))
         test_loader = DataLoader(dataset, batch_size=20, shuffle=False)
 
     elif args.dataset == "synth":

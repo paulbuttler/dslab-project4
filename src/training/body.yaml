@@ -6,8 +6,8 @@ project: body_dnn
 # Training parameters
 device: auto
 seed: 42
-epochs: 500               # 600 for body, 300 for hand
-batch_size: 51            # 256 
+epochs: 400               # 600 for body, 300 for hand
+batch_size: 50            # 256 
 accumulation_steps: 5     # simulates larger batch size
 val_batch_size: 128
 lr: 0.0001                # 0.0001 
@@ -34,7 +34,7 @@ aug:
   crop_size: 256.0        # 256.0 for body, 128.0 for hand
   roi:
     angle: 25.0           
-    scale: [-0.05, 0.15]
+    scale: [-0.05, 0.10]
     trans: 0.05
   appearance:
     probs: 
@@ -59,9 +59,9 @@ log_interval: 200
 val_interval: 800
 
 # Data parameters
-data_root: /cluster/project/hilliges/dsl_4/body/synth_body ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
-meta_file: /cluster/project/hilliges/dsl_4/body/body_meta.pkl ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
-val_ratio: 0.05
+data_root:  ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
+meta_file:  ### ATTN: MAKE SURE TO ADJUST THIS LINE!!!!!!!!!
+val_ratio: 0.10
 test_ratio: 0.0
 num_workers: 4
 
