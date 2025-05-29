@@ -145,3 +145,45 @@ def visualize_pose_and_shape(
         v.scene.origin.enabled = False
         v.shadows_enabled = False
         v.run()
+
+
+def visualize_prediction(images, pose, shape, cam_int, cam_ext):
+    """
+    Visualizes the predicted pose and shape in 3D using aitviewer.
+
+    Args:
+        images (torch.Tensor): Batch of input images.
+        pose (torch.Tensor): Predicted pose parameters.
+        shape (torch.Tensor): Predicted shape parameters.
+        cam_int (torch.Tensor): Camera intrinsics.
+        cam_ext (torch.Tensor): Camera extrinsics.
+    """
+    smpl_layer = SMPLLayer(model_type="smplh", gender="neutral", num_betas=shape.shape[1])
+    B = pose.shape[0]
+
+    images = images.permute(0, 2, 3, 1).cpu().numpy()  # [B, H, W, C]
+    images = (images * 255).astype(np.uint8)
+    images = [cv2.cvtColor(img, cv2.COLOR_RGB2BGR) for img in images]
+
+    for idx in range(B):
+        smpl_seq = SMPLSequence(
+            smpl_layer=smpl_layer,
+            betas=shape[idx],
+            poses_root=pose[idx, 0].reshape(1, -1),
+            poses_body=pose[idx, 1:22].reshape(1, -1),
+            poses_left_hand=pose[idx, 22:37].reshape(1, -1),
+            poses_right_hand=pose[idx, 37:].reshape(1, -1),
+        )
+
+        img_np = images[idx]
+        cols, rows = img_np.shape[1], img_np.shape[0]
+        v = Viewer(size=(cols, rows))
+        camera = OpenCVCamera(cam_int[idx].numpy(), cam_ext[idx].numpy(), cols, rows, viewer=v)
+        billboard = Billboard.from_camera_and_distance(camera, 5.0, cols, rows, [img_np])
+        v.scene.add(billboard, camera, smpl_seq)
+        v.set_temp_camera(camera)
+
+        v.scene.floor.enabled = False
+        v.scene.origin.enabled = False
+        v.shadows_enabled = False
+        v.run()
