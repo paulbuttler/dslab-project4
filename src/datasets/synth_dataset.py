@@ -94,8 +94,8 @@ if __name__ == "__main__":
 
     if body:
         dataset = SynDataset(
-            img_dir=Path("data/raw/synth_body"),
-            metadata="data/annotations/body_meta.pkl",
+            img_dir=Path("data/synth_body"),
+            metadata="data/annot/body_meta.pkl",
             aug={
                 "crop_size": 256.0,
                 "roi": {
@@ -121,8 +121,8 @@ if __name__ == "__main__":
         )
     else:
         dataset = SynDataset(
-            img_dir=Path("data/raw/synth_hand"),
-            metadata="data/annotations/hand_meta.pkl",
+            img_dir=Path("data/synth_hand"),
+            metadata="data/annot/hand_meta.pkl",
             aug={
                 "crop_size": 128.0,
                 "roi": {

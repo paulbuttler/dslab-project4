@@ -68,10 +68,10 @@ def main():
 
     # Save landmarks and relevant metadata to compressed files
     if not args.hand:
-        joblib.dump(body_meta, "data/annotations/body_meta.pkl")
-        joblib.dump(body_ldmks_roi, "data/annotations/body_ldmks_roi.pkl")
+        joblib.dump(body_meta, "data/annot/body_meta.pkl")
+        joblib.dump(body_ldmks_roi, "data/annot/body_ldmks_roi.pkl")
     else:
-        joblib.dump(hand_meta, "data/annotations/hand_meta.pkl")
+        joblib.dump(hand_meta, "data/annot/hand_meta.pkl")
 
 if __name__ == "__main__":
     main()

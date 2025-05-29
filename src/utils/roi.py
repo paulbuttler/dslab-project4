@@ -83,11 +83,11 @@ if __name__ == "__main__":
         exit(1)
 
     if not args.hand:
-        landmarks_dict = joblib.load("data/annotations/body_ldmks_roi.pkl")
+        landmarks_dict = joblib.load("data/annot/body_ldmks_roi.pkl")
         landmarks = landmarks_dict[uid]
         margin = 0.08
     else:
-        hand_meta = joblib.load("data/annotations/hand_meta.pkl")
+        hand_meta = joblib.load("data/annot/hand_meta.pkl")
         landmarks = hand_meta[uid]["ldmks_2d"]
         margin = 0.10
 

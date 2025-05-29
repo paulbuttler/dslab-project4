@@ -104,8 +104,8 @@ def visualize_batch_of_images(images):
 # Example usage
 if __name__ == "__main__":
 
-    data_root = f"data/raw/synth_body"
-    meta_file = f"data/annotations/body_meta.pkl"
+    data_root = f"data/synth_body"
+    meta_file = f"data/annot/body_meta.pkl"
 
     body_model, config = load_model("body")
     hand_model, _ = load_model("hand")

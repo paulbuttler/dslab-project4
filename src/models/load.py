@@ -2,7 +2,7 @@ import torch
 from models.model import MultiTaskDNN
 from utils.config import ConfigManager
 from datasets.transforms import denormalize
-from utils.rottrans import rotation_6d_to_matrix, aa2rot
+from utils.rottrans import rotation_6d_to_matrix, rot2aa
 from datasets.synth_dataset import SynDataset
 from torch.utils.data import DataLoader
 
@@ -124,8 +124,8 @@ def get_val_dataloader(config, data_root, meta_file, batch_size=16, mode="val"):
 if __name__ == "__main__":
     part = "body"  # Change to "hand" for hand model
 
-    data_root = f"./data/raw/synth_{part}"
-    meta_file = f"./data/annotations/{part}_meta.pkl"
+    data_root = f"./data/synth_{part}"
+    meta_file = f"./data/annot/{part}_meta.pkl"
 
     model, config = load_model(part)
 
@@ -145,5 +145,5 @@ if __name__ == "__main__":
         pred_pose,
     ) = get_predictions(model, batch, config.device)
 
-    # Concatenated ground truth shape parameters and pose rotation matrices
-    full_shape, full_pose = get_full_shape_and_pose(pred_shape, pred_pose, gt_shape, aa2rot(gt_pose))
+    # Concatenate missing ground truth shape and pose parameters
+    full_shape, full_pose = get_full_shape_and_pose(pred_shape, rot2aa(pred_pose), gt_shape, gt_pose)
