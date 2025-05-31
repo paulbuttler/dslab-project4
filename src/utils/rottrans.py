@@ -1,5 +1,5 @@
-# This file contains toolkits from aitviewer
-# Copy useful functions to here to avoid import the entire aitviewer
+# This file contains useful toolkits from aitviewer: https://github.com/eth-ait/aitviewer
+# Copyright (C) 2023  ETH Zurich, Manuel Kaufmann, Velko Vechev, Dario Mylonopoulos
 import roma
 import torch
 import torch.nn.functional as F
@@ -186,79 +186,3 @@ def local_to_global(poses, part:str, output_format="aa", input_format="aa"):
     else:
         res = global_oris.reshape((-1, n_joints * 3 * 3))
     return res
-
-
-def global_to_local(
-    global_rots: torch.Tensor, part: str = "body", output_format: str = "aa"
-):
-    """
-    Convert global rotation matrices to local (parent-relative) rotations.
-    Args:
-        global_rots: (B, n_joints, 3, 3)
-        part: 'body', 'hand', or 'face'
-        output_format: 'rotmat' or 'aa'
-    Returns:
-        Local rotations in the requested format.
-    """
-    assert output_format in ("aa", "rotmat")
-    assert part in ("body", "hand", "face")
-
-    B, n_joints = global_rots.shape[:2]
-
-    plist = JOINT_PARENTS[part][:n_joints]
-    child_ids = [c for c, _ in plist]
-    parent_of = {c: p for c, p in plist}
-    idx_of_child = {c: i for i, c in enumerate(child_ids)}
-
-    local_rots = torch.empty_like(global_rots)
-
-    for idx, child_id in enumerate(child_ids):
-        parent_id = parent_of[child_id]
-        if parent_id == -1:
-            local_rots[:, idx] = global_rots[:, idx]
-        else:
-            p_idx = idx_of_child[parent_id]
-            local_rots[:, idx] = (
-                global_rots[:, p_idx].transpose(-1, -2) @ global_rots[:, idx]
-            )
-
-    if output_format == "rotmat":
-        return local_rots
-    return rot2aa(local_rots.reshape(-1, 3, 3)).reshape(B, n_joints, 3)
-
-
-if __name__ == "__main__":
-    # # Test the round-trip conversion between local and global representations
-    # batch_size = 4
-    # n_joints = 52
-    # local_aa = torch.randn(batch_size, n_joints, 3) * 0.3
-
-    # local_flat = local_aa.reshape(batch_size, n_joints * 3)  # (B, J*3)
-
-    # global_rotmats = local_to_global(
-    #     local_flat,
-    #     part="body",
-    #     output_format="rotmat",
-    #     input_format="aa",
-    # ).reshape(batch_size, n_joints, 3, 3)
-
-    # recovered_local_aa = global_to_local(
-    #     global_rotmats, part="body", output_format="aa"
-    # )  # (B, J, 3)
-
-    # R_orig = aa2rot(local_aa.reshape(-1, 3)).reshape(batch_size, n_joints, 3, 3)
-    # R_recovered = aa2rot(recovered_local_aa.reshape(-1, 3)).reshape_as(R_orig)
-
-    # assert torch.allclose(
-    #     R_orig, R_recovered, atol=1e-6
-    # ), f"max rot-mat diff { (R_orig-R_recovered).abs().max().item()}"
-    # print("✅ round-trip passed, max diff ≲ 1e-6")
-
-    import math
-
-    aa = torch.tensor([[32.0, -79.0, 123.0]]) * math.pi / 180.0
-    R = aa2rot(aa)
-    d6 = matrix_to_rotation_6d(R)  # (*, 6)
-    R2 = rotation_6d_to_matrix(d6)  # (*, 3, 3)
-    print(torch.allclose(R, R2, atol=1e-6))  # True (up to numerical noise)
-    print(aa, rot2aa(R2))
