@@ -178,7 +178,7 @@ Optional flags are:
 * `--visualize`      Visualize predictions for randomly selected samples from each batch
 
 ## Acknowledgments
-This project was developed at ETH Zurich by Paul Buttler, Shuting Mi, Chengzhi Yi and Andrin Gasser as part of the Data Science Lab course.
+This project was developed for the Data Science Lab course at ETH Zurich by Paul Buttler, Shuting Mi, Chengzhi Yi and Andrin Gasser.
 
 We would like to thank our supervisor, Dr. Manuel Kaufmann, for his support and valuable feedback throughout the project.
 
