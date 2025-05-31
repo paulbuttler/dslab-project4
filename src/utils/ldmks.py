@@ -1,5 +1,3 @@
-# Parts of the code are copied from the repository: https://github.com/microsoft/SynthMoCap released under the MIT license.
-
 import os
 import cv2
 import numpy as np
@@ -7,7 +5,8 @@ from contextlib import redirect_stdout
 from aitviewer.models.smpl import SMPLLayer  # type: ignore
 from aitviewer.renderables.smpl import SMPLSequence  # type: ignore
 
-
+# Copied from the repository: https://github.com/microsoft/SynthMoCap and adapted for our use
+# Copyright (c) 2024 Microsoft Corporation
 def draw_landmarks(
     img: np.ndarray,
     ldmks_2d: np.ndarray,
