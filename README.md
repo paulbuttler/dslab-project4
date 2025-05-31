@@ -178,6 +178,8 @@ Optional flags are:
 * `--visualize`      Visualize predictions for randomly selected samples from each batch
 
 ## Acknowledgments
+This project was developed at ETH Zurich by Paul Buttler, Shuting Mi, Chengzhi Yi and Andrin Gasser as part of the Data Science Lab course.
+
 We would like to thank our supervisor, Dr. Manuel Kaufmann, for his support and valuable feedback throughout the project.
 
 We also thank the authors of [*Look Ma, no markers*](https://microsoft.github.io/SynthMoCap/) [Hewitt et al., 2024] for sharing both their method and the synthetic datasets we used, and the authors of [SMPL-X](https://smpl-x.is.tue.mpg.de/) [Pavlakos et al., 2019] for releasing their model code. We used the [MANO model](https://mano.is.tue.mpg.de/) [Romero et al., 2017] for hand pose estimation, and [AITViewer](https://eth-ait.github.io/aitviewer/) for 3D visualization throughout development and evaluation.
