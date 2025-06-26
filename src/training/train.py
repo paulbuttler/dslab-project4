@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import (
 )
 from datasets.synth_dataset import SynDataset
 from models.model import MultiTaskDNN
-from models.smplx import SMPLHLayer
+from smplx import SMPLHLayer
 from utils.config import ConfigManager
 from training.losses import DNNMultiTaskLoss
 from tqdm import tqdm
@@ -306,7 +306,7 @@ class Trainer:
                         "val/landmark_mean_std": val_loss["mean_std"],
                         "step": (epoch - 1) * len(self.train_loader) + batch_idx + 1,
                     }
-                    if self.body: 
+                    if self.body:
                         log_data["val/shape_loss"] = val_loss["shape"]
 
                     self.wandb_logger.log_metrics(log_data)
@@ -319,8 +319,8 @@ class Trainer:
                 self.val_history["landmark_mse"].append(val_loss["landmark_mse"])
                 self.val_history["mean_std"].append(val_loss["mean_std"])
 
-                if self.body: 
-                    self.val_history["shape"].append(val_loss["shape"]) 
+                if self.body:
+                    self.val_history["shape"].append(val_loss["shape"])
 
                 self.model.train()
 

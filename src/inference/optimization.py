@@ -6,7 +6,7 @@ import warnings
 import json
 import matplotlib.pyplot as plt
 from omegaconf import OmegaConf
-from models.smplx import SMPLHLayer
+from smplx import SMPLHLayer
 from models.load import load_model, get_val_dataloader
 from inference.initialization import initial_pose_estimation
 from human_body_prior.models.vposer_model import VPoser  # type: ignore

@@ -261,7 +261,7 @@ class DNNMultiTaskLoss(nn.Module):
 # Test loss function implementation
 if __name__ == "__main__":
 
-    from models.smplx import SMPLHLayer
+    from smplx import SMPLHLayer
     from types import SimpleNamespace
 
     device = "cuda" if torch.cuda.is_available() else "cpu"

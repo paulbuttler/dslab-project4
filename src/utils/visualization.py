@@ -3,7 +3,7 @@ import cv2
 import json
 import torch
 import numpy as np
-from models.smplx import SMPLHLayer
+from smplx import SMPLHLayer
 from aitviewer.models.smpl import SMPLLayer  # type: ignore
 from aitviewer.renderables.smpl import SMPLSequence  # type: ignore
 from aitviewer.renderables.billboard import Billboard  # type: ignore

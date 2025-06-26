@@ -103,7 +103,7 @@ Optional flags include
 * `--fidx`      Specify a frame index
 
 ## Training
-For training, a subset of the earlier-installed dependencies is sufficient. We recommend using the dependencies listed in `requirements_euler.txt`.
+For training, a subset of the earlier-installed dependencies is sufficient. We still require the latest developer package of smplx but recommend installing only the additional dependencies listed in `requirements_euler.txt` (e.g. for training on a cluster).
 
 Navigate to the `src` directory and configure training parameters in:
 * `training/body.yaml` (for training the body network)
