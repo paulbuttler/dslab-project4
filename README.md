@@ -1,6 +1,6 @@
 # Look Ma, No Markers - Implementation for 3D Body and Hand Pose Estimation
 
-This repository implements 3D body and hand pose estimation based on the paper [*Look Ma, no markers*](https://microsoft.github.io/SynthMoCap/) [Hewitt et al., 2024], using synthetic [data](https://github.com/microsoft/SynthMoCap) provided by the authors.
+This repository contains a from-scratch implementation of 3D body and hand pose estimation based on the paper Look Ma, No Markers (Hewitt et al., 2024), using synthetic training data provided by the authors. The original code was not publicly released.
 
 <p float="left">
  <img src="experiments/synth/full/ldmks_id_0000801_001.png" width="300" />
@@ -182,4 +182,4 @@ This project was developed for the Data Science Lab course at ETH Zurich by Paul
 
 We would like to thank our supervisor, Dr. Manuel Kaufmann, for his support and valuable feedback throughout the project.
 
-We also thank the authors of [*Look Ma, no markers*](https://microsoft.github.io/SynthMoCap/) [Hewitt et al., 2024] for sharing both their method and the synthetic datasets we used, and the authors of [SMPL-X](https://smpl-x.is.tue.mpg.de/) [Pavlakos et al., 2019] for releasing their model code. We used the [MANO model](https://mano.is.tue.mpg.de/) [Romero et al., 2017] for hand pose estimation, and [AITViewer](https://eth-ait.github.io/aitviewer/) for 3D visualization throughout development and evaluation.
+We also thank the authors of [*Look Ma, no markers*](https://microsoft.github.io/SynthMoCap/) for sharing both their method and the synthetic datasets we used, and the creators of [SMPL-X](https://smpl-x.is.tue.mpg.de/) for releasing their model code. We used the [MANO model](https://mano.is.tue.mpg.de/) for hand pose estimation, and [AITViewer](https://eth-ait.github.io/aitviewer/) for 3D visualization throughout development and evaluation.
